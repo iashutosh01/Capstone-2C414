@@ -1,0 +1,314 @@
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+// Get user from localStorage
+const getUserFromStorage = () => {
+  const user = localStorage.getItem('user');
+  return user ? JSON.parse(user) : null;
+};
+
+const getTokenFromStorage = () => {
+  return localStorage.getItem('accessToken');
+};
+
+// Initial state
+const initialState = {
+  user: getUserFromStorage(),
+  accessToken: getTokenFromStorage(),
+  isAuthenticated: !!getTokenFromStorage(),
+  loading: false,
+  error: null,
+  message: null,
+};
+
+// Async thunks
+
+// Register user
+export const register = createAsyncThunk(
+  'auth/register',
+  async (userData, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${API_URL}/auth/register`, userData);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error?.message || 'Registration failed'
+      );
+    }
+  }
+);
+
+// Login user
+export const login = createAsyncThunk(
+  'auth/login',
+  async (credentials, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${API_URL}/auth/login`, credentials, {
+        withCredentials: true, // Include cookies
+      });
+
+      const { user, accessToken } = response.data.data;
+
+      // Save to localStorage
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('accessToken', accessToken);
+
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error?.message || 'Login failed'
+      );
+    }
+  }
+);
+
+// Logout user
+export const logout = createAsyncThunk(
+  'auth/logout',
+  async (_, { rejectWithValue, getState }) => {
+    try {
+      const { accessToken } = getState().auth;
+
+      await axios.post(
+        `${API_URL}/auth/logout`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          withCredentials: true,
+        }
+      );
+
+      // Clear localStorage
+      localStorage.removeItem('user');
+      localStorage.removeItem('accessToken');
+
+      return null;
+    } catch (error) {
+      // Clear localStorage anyway
+      localStorage.removeItem('user');
+      localStorage.removeItem('accessToken');
+
+      return rejectWithValue(
+        error.response?.data?.error?.message || 'Logout failed'
+      );
+    }
+  }
+);
+
+// Verify email
+export const verifyEmail = createAsyncThunk(
+  'auth/verifyEmail',
+  async (token, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_URL}/auth/verify-email/${token}`);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error?.message || 'Email verification failed'
+      );
+    }
+  }
+);
+
+// Forgot password
+export const forgotPassword = createAsyncThunk(
+  'auth/forgotPassword',
+  async (email, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${API_URL}/auth/forgot-password`, { email });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error?.message || 'Failed to send reset email'
+      );
+    }
+  }
+);
+
+// Reset password
+export const resetPassword = createAsyncThunk(
+  'auth/resetPassword',
+  async ({ token, password }, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${API_URL}/auth/reset-password/${token}`, {
+        password,
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error?.message || 'Password reset failed'
+      );
+    }
+  }
+);
+
+// Get current user
+export const getCurrentUser = createAsyncThunk(
+  'auth/getCurrentUser',
+  async (_, { rejectWithValue, getState }) => {
+    try {
+      const { accessToken } = getState().auth;
+
+      const response = await axios.get(`${API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      const user = response.data.data.user;
+      localStorage.setItem('user', JSON.stringify(user));
+
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error?.message || 'Failed to get user data'
+      );
+    }
+  }
+);
+
+// Auth slice
+const authSlice = createSlice({
+  name: 'auth',
+  initialState,
+  reducers: {
+    clearError: (state) => {
+      state.error = null;
+    },
+    clearMessage: (state) => {
+      state.message = null;
+    },
+    setCredentials: (state, action) => {
+      const { user, accessToken } = action.payload;
+      state.user = user;
+      state.accessToken = accessToken;
+      state.isAuthenticated = true;
+
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('accessToken', accessToken);
+    },
+    clearCredentials: (state) => {
+      state.user = null;
+      state.accessToken = null;
+      state.isAuthenticated = false;
+
+      localStorage.removeItem('user');
+      localStorage.removeItem('accessToken');
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      // Register
+      .addCase(register.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.message = null;
+      })
+      .addCase(register.fulfilled, (state, action) => {
+        state.loading = false;
+        state.message = action.payload.message;
+      })
+      .addCase(register.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      // Login
+      .addCase(login.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(login.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isAuthenticated = true;
+        state.user = action.payload.data.user;
+        state.accessToken = action.payload.data.accessToken;
+      })
+      .addCase(login.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        state.isAuthenticated = false;
+      })
+
+      // Logout
+      .addCase(logout.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(logout.fulfilled, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.accessToken = null;
+        state.isAuthenticated = false;
+        state.error = null;
+      })
+      .addCase(logout.rejected, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.accessToken = null;
+        state.isAuthenticated = false;
+      })
+
+      // Verify email
+      .addCase(verifyEmail.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.message = null;
+      })
+      .addCase(verifyEmail.fulfilled, (state, action) => {
+        state.loading = false;
+        state.message = action.payload.message;
+      })
+      .addCase(verifyEmail.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      // Forgot password
+      .addCase(forgotPassword.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.message = null;
+      })
+      .addCase(forgotPassword.fulfilled, (state, action) => {
+        state.loading = false;
+        state.message = action.payload.message;
+      })
+      .addCase(forgotPassword.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      // Reset password
+      .addCase(resetPassword.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.message = null;
+      })
+      .addCase(resetPassword.fulfilled, (state, action) => {
+        state.loading = false;
+        state.message = action.payload.message;
+      })
+      .addCase(resetPassword.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      // Get current user
+      .addCase(getCurrentUser.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(getCurrentUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.data.user;
+      })
+      .addCase(getCurrentUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        // Don't clear auth on failure - token might still be valid
+      });
+  },
+});
+
+export const { clearError, clearMessage, setCredentials, clearCredentials } = authSlice.actions;
+
+export default authSlice.reducer;
