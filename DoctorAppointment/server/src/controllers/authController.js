@@ -1,17 +1,47 @@
 import crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
 import { generateTokens, verifyRefreshToken } from '../utils/generateToken.js';
+import { sendVerificationEmail } from '../utils/emailService.js';
 
-/**
- * @desc    Register new user
- * @route   POST /api/auth/register
- * @access  Public
- */
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+const generateVerificationToken = () => {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+  return {
+    rawToken,
+    hashedToken,
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+  };
+};
+
+const sanitizeOAuthName = (value, fallback) => {
+  if (!value || /\d/.test(value)) {
+    return fallback;
+  }
+
+  return value.trim();
+};
+
+const buildAuthResponse = (user, accessToken) => ({
+  user: {
+    id: user._id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    role: user.role,
+    phone: user.phone,
+    isEmailVerified: user.isEmailVerified,
+  },
+  accessToken,
+});
+
 export const register = async (req, res, next) => {
   try {
     const { email, password, firstName, lastName, phone, role, ...otherFields } = req.body;
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -23,7 +53,8 @@ export const register = async (req, res, next) => {
       });
     }
 
-    // Create user with email already verified
+    const { rawToken, hashedToken, expiresAt } = generateVerificationToken();
+
     const user = await User.create({
       email,
       password,
@@ -31,13 +62,21 @@ export const register = async (req, res, next) => {
       lastName,
       phone,
       role: role || 'patient',
-      isEmailVerified: true, // Auto-verify email
+      isEmailVerified: false,
+      emailVerificationToken: hashedToken,
+      emailVerificationExpires: expiresAt,
       ...otherFields,
     });
 
-    res.status(201).json({
+    await sendVerificationEmail({
+      email: user.email,
+      firstName: user.firstName,
+      verificationToken: rawToken,
+    });
+
+    return res.status(201).json({
       success: true,
-      message: 'Registration successful. You can now login.',
+      message: 'Registration successful. Please verify your email before logging in.',
       data: {
         user: {
           id: user._id,
@@ -50,20 +89,14 @@ export const register = async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-/**
- * @desc    Login user
- * @route   POST /api/auth/login
- * @access  Public
- */
 export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    // Validation
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -74,7 +107,6 @@ export const login = async (req, res, next) => {
       });
     }
 
-    // Check if user exists (include password for comparison)
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
       return res.status(401).json({
@@ -86,7 +118,16 @@ export const login = async (req, res, next) => {
       });
     }
 
-    // Check password
+    if (!user.isEmailVerified) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'EMAIL_NOT_VERIFIED',
+          message: 'Please verify your email before logging in.',
+        },
+      });
+    }
+
     const isPasswordMatch = await user.comparePassword(password);
     if (!isPasswordMatch) {
       return res.status(401).json({
@@ -98,54 +139,109 @@ export const login = async (req, res, next) => {
       });
     }
 
-    // Generate tokens
     const { accessToken, refreshToken } = generateTokens(user._id.toString(), user.role);
 
-    // Save refresh token to user
     user.refreshToken = refreshToken;
     user.lastLogin = Date.now();
     await user.save();
 
-    // Set refresh token in HTTP-only cookie
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // Use secure in production
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'Login successful',
-      data: {
-        user: {
-          id: user._id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          phone: user.phone,
-        },
-        accessToken,
-      },
+      data: buildAuthResponse(user, accessToken),
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-/**
- * @desc    Verify email address
- * @route   GET /api/auth/verify-email/:token
- * @access  Public
- */
+export const googleOAuthLogin = async (req, res, next) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_GOOGLE_CREDENTIAL',
+          message: 'Google credential is required',
+        },
+      });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+
+    if (!payload?.email) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_GOOGLE_ACCOUNT',
+          message: 'Unable to read Google account details',
+        },
+      });
+    }
+
+    let user = await User.findOne({ email: payload.email });
+
+    if (!user) {
+      user = await User.create({
+        email: payload.email,
+        password: crypto.randomBytes(24).toString('hex'),
+        firstName: sanitizeOAuthName(payload.given_name, 'Google'),
+        lastName: sanitizeOAuthName(payload.family_name, 'User'),
+        phone: '0000000000',
+        role: 'patient',
+        isEmailVerified: true,
+      });
+    } else if (!user.isEmailVerified && payload.email_verified) {
+      user.isEmailVerified = true;
+      user.emailVerificationToken = undefined;
+      user.emailVerificationExpires = undefined;
+      await user.save();
+    }
+
+    const { accessToken, refreshToken } = generateTokens(user._id.toString(), user.role);
+
+    user.refreshToken = refreshToken;
+    user.lastLogin = Date.now();
+    await user.save();
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Google login successful',
+      data: buildAuthResponse(user, accessToken),
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const verifyEmail = async (req, res, next) => {
   try {
     const { token } = req.params;
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
-    // Find user with valid token
     const user = await User.findOne({
-      emailVerificationToken: token,
+      emailVerificationToken: hashedToken,
       emailVerificationExpires: { $gt: Date.now() },
     });
 
@@ -159,26 +255,66 @@ export const verifyEmail = async (req, res, next) => {
       });
     }
 
-    // Update user
     user.isEmailVerified = true;
     user.emailVerificationToken = undefined;
     user.emailVerificationExpires = undefined;
     await user.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'Email verified successfully. You can now login.',
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-/**
- * @desc    Request password reset
- * @route   POST /api/auth/forgot-password
- * @access  Public
- */
+export const resendVerificationEmail = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'No user found with this email address',
+        },
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'ALREADY_VERIFIED',
+          message: 'Email is already verified',
+        },
+      });
+    }
+
+    const { rawToken, hashedToken, expiresAt } = generateVerificationToken();
+    user.emailVerificationToken = hashedToken;
+    user.emailVerificationExpires = expiresAt;
+    await user.save();
+
+    await sendVerificationEmail({
+      email: user.email,
+      firstName: user.firstName,
+      verificationToken: rawToken,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Verification email sent successfully',
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -195,7 +331,6 @@ export const forgotPassword = async (req, res, next) => {
 
     const user = await User.findOne({ email });
 
-    // Don't reveal if user exists or not (security best practice)
     if (!user) {
       return res.status(200).json({
         success: true,
@@ -203,26 +338,20 @@ export const forgotPassword = async (req, res, next) => {
       });
     }
 
-    // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+    user.resetPasswordExpires = Date.now() + 60 * 60 * 1000;
     await user.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'Password reset token generated. Check with admin for reset link.',
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-/**
- * @desc    Reset password
- * @route   POST /api/auth/reset-password/:token
- * @access  Public
- */
 export const resetPassword = async (req, res, next) => {
   try {
     const { token } = req.params;
@@ -248,7 +377,6 @@ export const resetPassword = async (req, res, next) => {
       });
     }
 
-    // Find user with valid reset token
     const user = await User.findOne({
       resetPasswordToken: token,
       resetPasswordExpires: { $gt: Date.now() },
@@ -264,27 +392,21 @@ export const resetPassword = async (req, res, next) => {
       });
     }
 
-    // Update password
     user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
-    user.refreshToken = undefined; // Invalidate existing sessions
+    user.refreshToken = undefined;
     await user.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'Password reset successful. You can now login with your new password.',
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-/**
- * @desc    Refresh access token
- * @route   POST /api/auth/refresh-token
- * @access  Public
- */
 export const refreshAccessToken = async (req, res, next) => {
   try {
     const { refreshToken } = req.cookies;
@@ -299,7 +421,6 @@ export const refreshAccessToken = async (req, res, next) => {
       });
     }
 
-    // Verify refresh token
     let decoded;
     try {
       decoded = verifyRefreshToken(refreshToken);
@@ -313,7 +434,6 @@ export const refreshAccessToken = async (req, res, next) => {
       });
     }
 
-    // Find user and check if refresh token matches
     const user = await User.findById(decoded.userId);
     if (!user || user.refreshToken !== refreshToken) {
       return res.status(401).json({
@@ -325,17 +445,14 @@ export const refreshAccessToken = async (req, res, next) => {
       });
     }
 
-    // Generate new tokens
     const { accessToken, refreshToken: newRefreshToken } = generateTokens(
       user._id.toString(),
       user.role
     );
 
-    // Update refresh token
     user.refreshToken = newRefreshToken;
     await user.save();
 
-    // Set new refresh token in cookie
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -343,59 +460,47 @@ export const refreshAccessToken = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: {
         accessToken,
       },
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-/**
- * @desc    Get current user info
- * @route   GET /api/auth/me
- * @access  Private
- */
 export const getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: {
         user,
       },
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
-/**
- * @desc    Logout user
- * @route   POST /api/auth/logout
- * @access  Private
- */
 export const logout = async (req, res, next) => {
   try {
-    // Clear refresh token from database
     const user = await User.findById(req.user._id);
     if (user) {
       user.refreshToken = undefined;
       await user.save();
     }
 
-    // Clear refresh token cookie
     res.clearCookie('refreshToken');
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'Logged out successfully',
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };

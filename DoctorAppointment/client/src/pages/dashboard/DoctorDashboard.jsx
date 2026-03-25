@@ -1,22 +1,51 @@
+import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../redux/slices/authSlice';
 import Button from '../../components/common/Button';
+import Input from '../../components/common/Input';
+import {
+  clearAppointmentError,
+  clearAppointmentSuccess,
+  getDoctorSchedule,
+  updateDoctorAvailability,
+} from '../../redux/slices/appointmentSlice';
 
 const DoctorDashboard = () => {
   const { user } = useSelector((state) => state.auth);
+  const { doctorSchedule, loading, actionLoading, error, successMessage } = useSelector(
+    (state) => state.appointments
+  );
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [availabilityForm, setAvailabilityForm] = useState({
+    availabilityStatus: user?.availabilityStatus || 'available',
+    slotDate: '',
+    startTime: '',
+    endTime: '',
+    availabilityNotes: '',
+  });
+
+  useEffect(() => {
+    dispatch(getDoctorSchedule());
+    dispatch(clearAppointmentError());
+    dispatch(clearAppointmentSuccess());
+  }, [dispatch]);
 
   const handleLogout = async () => {
     await dispatch(logout());
     navigate('/login');
   };
 
+  const handleAvailabilitySubmit = async () => {
+    await dispatch(updateDoctorAvailability(availabilityForm));
+    dispatch(getDoctorSchedule());
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+    <div className="min-h-screen bg-[linear-gradient(180deg,_#ecfeff,_#ffffff_38%,_#f8fafc)]">
+      <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-6 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-bold text-gray-900">Doctor Dashboard</h1>
           <Button onClick={handleLogout} variant="outline" size="sm">
             Logout
@@ -24,9 +53,9 @@ const DoctorDashboard = () => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-2 text-2xl font-semibold text-gray-900">
             Dr. {user?.firstName} {user?.lastName}
           </h2>
           <p className="text-gray-600">Specialization: {user?.specialization}</p>
@@ -34,43 +63,119 @@ const DoctorDashboard = () => {
           <p className="text-gray-600">Phone: {user?.phone}</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="bg-green-100 p-3 rounded-full w-12 mb-4">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold mb-2">Today's Appointments</h3>
-            <p className="text-3xl font-bold text-gray-900">0</p>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-2 text-lg font-semibold">Active Appointments</h3>
+            <p className="text-3xl font-bold text-gray-900">{doctorSchedule.length}</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="bg-blue-100 p-3 rounded-full w-12 mb-4">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold mb-2">Total Patients</h3>
-            <p className="text-3xl font-bold text-gray-900">0</p>
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-2 text-lg font-semibold">Unique Patients</h3>
+            <p className="text-3xl font-bold text-gray-900">
+              {new Set(doctorSchedule.map((appointment) => appointment.patient?._id)).size}
+            </p>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="bg-purple-100 p-3 rounded-full w-12 mb-4">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold mb-2">Availability Status</h3>
-            <p className="text-lg font-medium text-green-600">Available</p>
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-2 text-lg font-semibold">Availability Status</h3>
+            <p className="text-lg font-medium capitalize text-green-600">
+              {availabilityForm.availabilityStatus}
+            </p>
           </div>
         </div>
 
-        <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-green-900 mb-2">Doctor Portal Features Coming Soon</h3>
-          <p className="text-green-800">
-            Manage appointments, view patient records, set availability, and more features will be available soon.
-          </p>
+        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-1">
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">Update Availability</h3>
+            <div className="space-y-4">
+              {error ? <p className="text-sm text-red-600">{error}</p> : null}
+              {successMessage ? <p className="text-sm text-emerald-600">{successMessage}</p> : null}
+
+              <select
+                value={availabilityForm.availabilityStatus}
+                onChange={(event) =>
+                  setAvailabilityForm((previous) => ({
+                    ...previous,
+                    availabilityStatus: event.target.value,
+                  }))
+                }
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="available">Available</option>
+                <option value="busy">Busy</option>
+                <option value="break">Break</option>
+                <option value="offline">Offline</option>
+              </select>
+
+              <Input
+                label="Slot date"
+                type="date"
+                name="slotDate"
+                value={availabilityForm.slotDate}
+                onChange={(event) =>
+                  setAvailabilityForm((previous) => ({ ...previous, slotDate: event.target.value }))
+                }
+              />
+              <Input
+                label="Start time"
+                type="time"
+                name="startTime"
+                value={availabilityForm.startTime}
+                onChange={(event) =>
+                  setAvailabilityForm((previous) => ({ ...previous, startTime: event.target.value }))
+                }
+              />
+              <Input
+                label="End time"
+                type="time"
+                name="endTime"
+                value={availabilityForm.endTime}
+                onChange={(event) =>
+                  setAvailabilityForm((previous) => ({ ...previous, endTime: event.target.value }))
+                }
+              />
+              <Input
+                label="Notes"
+                name="availabilityNotes"
+                value={availabilityForm.availabilityNotes}
+                onChange={(event) =>
+                  setAvailabilityForm((previous) => ({
+                    ...previous,
+                    availabilityNotes: event.target.value,
+                  }))
+                }
+                placeholder="Short note for this schedule update"
+              />
+
+              <Button variant="primary" onClick={handleAvailabilitySubmit} loading={actionLoading}>
+                Save Status
+              </Button>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-green-200 bg-green-50 p-6 lg:col-span-2">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-green-900">Schedule</h3>
+              {loading ? <span className="text-sm text-green-700">Loading...</span> : null}
+            </div>
+            <div className="space-y-3">
+              {doctorSchedule.length === 0 ? (
+                <p className="text-green-800">No appointments scheduled yet.</p>
+              ) : (
+                doctorSchedule.map((appointment) => (
+                  <div key={appointment._id} className="rounded-2xl border border-green-100 bg-white p-4">
+                    <p className="font-semibold text-gray-900">
+                      {appointment.patient?.firstName} {appointment.patient?.lastName}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {new Date(appointment.appointmentDate).toLocaleDateString()} | {appointment.startTime} - {appointment.endTime}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">Status: {appointment.status}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </main>
     </div>

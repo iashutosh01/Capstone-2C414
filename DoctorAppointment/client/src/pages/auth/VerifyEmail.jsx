@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
-import { verifyEmail } from '../../redux/slices/authSlice';
+import { resendVerificationEmail, verifyEmail } from '../../redux/slices/authSlice';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import Button from '../../components/common/Button';
 
@@ -11,6 +11,7 @@ const VerifyEmail = () => {
   const navigate = useNavigate();
   const { loading, error, message } = useSelector((state) => state.auth);
   const [verificationAttempted, setVerificationAttempted] = useState(false);
+  const [email, setEmail] = useState('');
 
   useEffect(() => {
     if (token && !verificationAttempted) {
@@ -44,7 +45,22 @@ const VerifyEmail = () => {
           <p className="text-sm text-gray-500 mb-6">
             The verification link may have expired or is invalid. Please try registering again or contact support.
           </p>
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="Enter your email to resend verification"
+            className="mb-3 w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
           <div className="space-y-3">
+            <Button
+              onClick={() => dispatch(resendVerificationEmail(email))}
+              variant="secondary"
+              fullWidth
+              disabled={!email}
+            >
+              Resend Verification
+            </Button>
             <Button
               onClick={() => navigate('/register')}
               variant="primary"

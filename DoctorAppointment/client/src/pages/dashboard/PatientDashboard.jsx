@@ -1,12 +1,23 @@
+import { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { logout } from '../../redux/slices/authSlice';
 import Button from '../../components/common/Button';
+import NotificationBell from '../../components/common/NotificationBell';
+import { getMyAppointments, getNotifications } from '../../redux/slices/appointmentSlice';
 
 const PatientDashboard = () => {
   const { user } = useSelector((state) => state.auth);
+  const { appointments, notifications, loading } = useSelector((state) => state.appointments);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    dispatch(getMyAppointments());
+    dispatch(getNotifications());
+  }, [dispatch]);
+
+  const upcomingAppointments = appointments.filter((appointment) => appointment.status !== 'cancelled');
 
   const handleLogout = async () => {
     await dispatch(logout());
@@ -14,85 +25,94 @@ const PatientDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+    <div className="min-h-screen bg-[linear-gradient(180deg,_#f0f9ff,_#ffffff_32%,_#f8fafc)]">
+      <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-6 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-bold text-gray-900">Patient Dashboard</h1>
-          <Button onClick={handleLogout} variant="outline" size="sm">
-            Logout
-          </Button>
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            <Button onClick={handleLogout} variant="outline" size="sm">
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        {/* Welcome Card */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-2 text-2xl font-semibold text-gray-900">
             Welcome back, {user?.firstName} {user?.lastName}!
           </h2>
           <p className="text-gray-600">Email: {user?.email}</p>
           <p className="text-gray-600">Phone: {user?.phone}</p>
         </div>
 
-        {/* Dashboard Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Book Appointment Card */}
-          <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-center mb-4">
-              <div className="bg-blue-100 p-3 rounded-full">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Book Appointment</h3>
-            <p className="text-gray-600 text-sm mb-4">Schedule an appointment with a doctor</p>
-            <Button variant="primary" size="sm" fullWidth>
-              Book Now
-            </Button>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">Book Appointment</h3>
+            <p className="mb-4 text-sm text-gray-600">Schedule an appointment with a doctor.</p>
+            <Link to="/patient/book">
+              <Button variant="primary" size="sm" fullWidth>
+                Book Now
+              </Button>
+            </Link>
           </div>
 
-          {/* My Appointments Card */}
-          <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-center mb-4">
-              <div className="bg-green-100 p-3 rounded-full">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">My Appointments</h3>
-            <p className="text-gray-600 text-sm mb-4">View and manage your appointments</p>
-            <Button variant="primary" size="sm" fullWidth>
-              View All
-            </Button>
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">My Appointments</h3>
+            <p className="mb-4 text-sm text-gray-600">View and manage your appointments.</p>
+            <Link to="/patient/appointments">
+              <Button variant="primary" size="sm" fullWidth>
+                View All
+              </Button>
+            </Link>
           </div>
 
-          {/* Medical Records Card */}
-          <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-center mb-4">
-              <div className="bg-purple-100 p-3 rounded-full">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Medical Records</h3>
-            <p className="text-gray-600 text-sm mb-4">Access your medical history</p>
-            <Button variant="primary" size="sm" fullWidth>
-              View Records
-            </Button>
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">Notifications</h3>
+            <p className="mb-4 text-sm text-gray-600">Track booking, waitlist, and schedule updates.</p>
+            <div className="text-3xl font-bold text-gray-900">{notifications.length}</div>
           </div>
         </div>
 
-        {/* Info Box */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-blue-900 mb-2">Coming Soon</h3>
-          <p className="text-blue-800">
-            Full appointment booking functionality with AI-based doctor availability and slot allocation will be available soon.
-          </p>
+        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Upcoming Appointments</h3>
+              {loading ? <span className="text-sm text-gray-500">Loading...</span> : null}
+            </div>
+            <div className="space-y-3">
+              {upcomingAppointments.slice(0, 4).map((appointment) => (
+                <div key={appointment._id} className="rounded-2xl border border-gray-200 p-3">
+                  <p className="font-medium text-gray-900">
+                    Dr. {appointment.doctor?.firstName} {appointment.doctor?.lastName}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {new Date(appointment.appointmentDate).toLocaleDateString()} | {appointment.startTime} - {appointment.endTime}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">Status: {appointment.status}</p>
+                </div>
+              ))}
+              {upcomingAppointments.length === 0 ? (
+                <p className="text-sm text-gray-500">No appointments booked yet.</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-blue-200 bg-blue-50 p-6">
+            <h3 className="mb-2 text-lg font-semibold text-blue-900">Notification Center</h3>
+            <div className="space-y-3">
+              {notifications.slice(0, 4).map((notification) => (
+                <div key={notification._id} className="rounded-2xl bg-white/80 p-3">
+                  <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
+                  <p className="mt-1 text-sm text-slate-600">{notification.message}</p>
+                </div>
+              ))}
+              {notifications.length === 0 ? (
+                <p className="text-sm text-blue-900">No notifications available right now.</p>
+              ) : null}
+            </div>
+          </div>
         </div>
       </main>
     </div>

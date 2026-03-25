@@ -4,27 +4,38 @@ import {
   register,
   login,
   verifyEmail,
+  resendVerificationEmail,
   forgotPassword,
   resetPassword,
   refreshAccessToken,
   getMe,
   logout,
+  googleOAuthLogin,
 } from '../controllers/authController.js';
 import { protect } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 
 const router = express.Router();
 
-// Validation rules
 const registerValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
   body('password')
     .isLength({ min: 8 })
     .withMessage('Password must be at least 8 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
-  body('firstName').trim().notEmpty().withMessage('First name is required'),
-  body('lastName').trim().notEmpty().withMessage('Last name is required'),
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/)
+    .withMessage('Password must contain uppercase, lowercase, number, and special character'),
+  body('firstName')
+    .trim()
+    .notEmpty()
+    .withMessage('First name is required')
+    .matches(/^[A-Za-z\s'-]+$/)
+    .withMessage('First name cannot contain numbers'),
+  body('lastName')
+    .trim()
+    .notEmpty()
+    .withMessage('Last name is required')
+    .matches(/^[A-Za-z\s'-]+$/)
+    .withMessage('Last name cannot contain numbers'),
   body('phone').matches(/^[0-9]{10}$/).withMessage('Please provide a valid 10-digit phone number'),
   body('role').optional().isIn(['patient', 'doctor', 'admin']).withMessage('Invalid role'),
 ];
@@ -38,23 +49,27 @@ const forgotPasswordValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
 ];
 
+const resendVerificationValidation = [
+  body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
+];
+
 const resetPasswordValidation = [
   body('password')
     .isLength({ min: 8 })
     .withMessage('Password must be at least 8 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/)
+    .withMessage('Password must contain uppercase, lowercase, number, and special character'),
 ];
 
-// Public routes
 router.post('/register', registerValidation, validate, register);
 router.post('/login', loginValidation, validate, login);
+router.post('/oauth/google', googleOAuthLogin);
 router.get('/verify-email/:token', verifyEmail);
+router.post('/resend-verification', resendVerificationValidation, validate, resendVerificationEmail);
 router.post('/forgot-password', forgotPasswordValidation, validate, forgotPassword);
 router.post('/reset-password/:token', resetPasswordValidation, validate, resetPassword);
 router.post('/refresh-token', refreshAccessToken);
 
-// Protected routes
 router.get('/me', protect, getMe);
 router.post('/logout', protect, logout);
 

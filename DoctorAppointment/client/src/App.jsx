@@ -11,6 +11,8 @@ import VerifyEmail from './pages/auth/VerifyEmail';
 import PatientDashboard from './pages/dashboard/PatientDashboard';
 import DoctorDashboard from './pages/dashboard/DoctorDashboard';
 import AdminDashboard from './pages/dashboard/AdminDashboard';
+import BookAppointment from './pages/appointments/BookAppointment';
+import PatientAppointments from './pages/appointments/PatientAppointments';
 
 // Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -48,6 +50,22 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['patient']}>
               <PatientDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patient/book"
+          element={
+            <ProtectedRoute allowedRoles={['patient']}>
+              <BookAppointment />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patient/appointments"
+          element={
+            <ProtectedRoute allowedRoles={['patient']}>
+              <PatientAppointments />
             </ProtectedRoute>
           }
         />

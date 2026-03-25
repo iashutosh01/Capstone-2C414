@@ -123,11 +123,35 @@ const userSchema = new mongoose.Schema(
         },
         startTime: String, // Format: "09:00"
         endTime: String, // Format: "17:00"
+        isActive: {
+          type: Boolean,
+          default: true,
+        },
       },
     ],
+    availabilityStatus: {
+      type: String,
+      enum: ['available', 'busy', 'break', 'offline'],
+      default: 'available',
+    },
     isAvailable: {
       type: Boolean,
       default: true,
+    },
+    availabilityUpdatedAt: {
+      type: Date,
+      default: null,
+    },
+    availabilityNotes: {
+      type: String,
+      trim: true,
+      maxlength: [250, 'Availability notes cannot exceed 250 characters'],
+      default: '',
+    },
+    maxDailyAppointments: {
+      type: Number,
+      min: [1, 'Max daily appointments must be at least 1'],
+      default: 20,
     },
 
     // Admin-specific fields
@@ -187,6 +211,25 @@ userSchema.methods.toJSON = function () {
 
 // Index for better query performance
 userSchema.index({ role: 1 });
+userSchema.index({ role: 1, availabilityStatus: 1 });
+
+userSchema.pre('save', function (next) {
+  if (this.role !== 'doctor') {
+    this.availableSlots = [];
+    this.availabilityStatus = 'offline';
+    this.isAvailable = false;
+    this.availabilityNotes = '';
+    this.availabilityUpdatedAt = this.availabilityUpdatedAt || null;
+    return next();
+  }
+
+  if (this.isModified('availabilityStatus') || this.isModified('isAvailable')) {
+    this.availabilityUpdatedAt = new Date();
+    this.isAvailable = this.availabilityStatus === 'available';
+  }
+
+  next();
+});
 
 const User = mongoose.model('User', userSchema);
 

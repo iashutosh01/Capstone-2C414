@@ -77,8 +77,17 @@ const Register = () => {
   const validateStep2 = () => {
     const errors = {};
 
-    if (!formData.firstName.trim()) errors.firstName = 'First name is required';
-    if (!formData.lastName.trim()) errors.lastName = 'Last name is required';
+    if (!formData.firstName.trim()) {
+      errors.firstName = 'First name is required';
+    } else if (!/^[A-Za-z\s'-]+$/.test(formData.firstName)) {
+      errors.firstName = 'First name cannot contain numbers';
+    }
+
+    if (!formData.lastName.trim()) {
+      errors.lastName = 'Last name is required';
+    } else if (!/^[A-Za-z\s'-]+$/.test(formData.lastName)) {
+      errors.lastName = 'Last name cannot contain numbers';
+    }
 
     if (!formData.email) {
       errors.email = 'Email is required';
@@ -96,8 +105,8 @@ const Register = () => {
       errors.password = 'Password is required';
     } else if (formData.password.length < 8) {
       errors.password = 'Password must be at least 8 characters';
-    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      errors.password = 'Password must contain uppercase, lowercase, and number';
+    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/.test(formData.password)) {
+      errors.password = 'Password must contain uppercase, lowercase, number, and special character';
     }
 
     if (!formData.confirmPassword) {
@@ -179,7 +188,7 @@ const Register = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Registration Successful!</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h2>
           <p className="text-gray-600 mb-6">{message}</p>
           <Button
             onClick={() => navigate('/login')}
@@ -187,7 +196,7 @@ const Register = () => {
             size="lg"
             fullWidth
           >
-            Go to Login
+            Continue to Login
           </Button>
         </div>
       </div>

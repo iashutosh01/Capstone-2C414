@@ -6,6 +6,9 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
+import appointmentRoutes from './routes/appointmentRoutes.js';
+import doctorRoutes from './routes/doctorRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import errorHandler, { notFound } from './middleware/errorHandler.js';
 
 // Load environment variables
@@ -83,6 +86,9 @@ app.get('/api/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/doctors', doctorRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 handler - must be after all routes
 app.use(notFound);
