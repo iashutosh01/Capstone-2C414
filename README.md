@@ -1,7 +1,7 @@
 ﻿# Capstone-2C414
 
-Hospital Appointment Management System
-A full-stack MERN application for managing hospital appointments with AI-based doctor availability and appointment slot allocation.
+Remote Doctor Consulation & Appointment Management System
+A full-stack MERN application for managing doctors appointments with AI-based doctor availability and appointment slot allocation.
 
 Features
 Authentication System
