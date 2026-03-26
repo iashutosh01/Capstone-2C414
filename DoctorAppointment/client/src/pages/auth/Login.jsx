@@ -5,12 +5,10 @@ import {
   clearError,
   clearMessage,
   login,
-  loginWithGoogle,
   resendVerificationEmail,
 } from '../../redux/slices/authSlice';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
-import GoogleSignInButton from '../../components/auth/GoogleSignInButton';
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -90,18 +88,10 @@ const Login = () => {
     }
   };
 
-  const handleGoogleLogin = async (credential) => {
-    const result = await dispatch(loginWithGoogle(credential));
-
-    if (loginWithGoogle.fulfilled.match(result)) {
-      const role = result.payload.data.user.role;
-      const dashboardRoutes = {
-        patient: '/patient/dashboard',
-        doctor: '/doctor/dashboard',
-        admin: '/admin/dashboard',
-      };
-      navigate(dashboardRoutes[role] || '/');
-    }
+  const handleGoogleRedirect = () => {
+    const googleAuthUrl =
+      import.meta.env.VITE_GOOGLE_AUTH_URL || 'http://localhost:5000/api/auth/google';
+    window.location.href = googleAuthUrl;
   };
 
   const showVerificationResend = error?.includes('verify your email');
@@ -191,7 +181,15 @@ const Login = () => {
             </div>
           </div>
 
-          <GoogleSignInButton onCredential={handleGoogleLogin} disabled={loading} />
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            fullWidth
+            onClick={handleGoogleRedirect}
+          >
+            Continue with Google
+          </Button>
 
           <div className="text-center">
             <p className="text-sm text-gray-600">

@@ -29,9 +29,85 @@ const appointmentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['scheduled', 'completed', 'cancelled', 'rescheduled', 'waitlisted', 'auto-assigned'],
+      enum: [
+        'pending_payment',
+        'confirmed',
+        'scheduled',
+        'completed',
+        'cancelled',
+        'rescheduled',
+        'waitlisted',
+        'auto-assigned',
+      ],
       default: 'scheduled',
       index: true,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['unpaid', 'pending', 'paid', 'failed', 'refunded'],
+      default: 'unpaid',
+      index: true,
+    },
+    payment: {
+      originalAmount: {
+        type: Number,
+        default: 0,
+      },
+      discountAmount: {
+        type: Number,
+        default: 0,
+      },
+      amount: {
+        type: Number,
+        default: 0,
+      },
+      currency: {
+        type: String,
+        default: 'INR',
+      },
+      receipt: {
+        type: String,
+        default: '',
+      },
+      orderId: {
+        type: String,
+        default: '',
+      },
+      paymentId: {
+        type: String,
+        default: '',
+      },
+      signature: {
+        type: String,
+        default: '',
+      },
+      paidAt: {
+        type: Date,
+        default: null,
+      },
+      coupon: {
+        couponId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Coupon',
+          default: null,
+        },
+        code: {
+          type: String,
+          default: '',
+        },
+        discountType: {
+          type: String,
+          default: '',
+        },
+        discountValue: {
+          type: Number,
+          default: 0,
+        },
+        discountApplied: {
+          type: Number,
+          default: 0,
+        },
+      },
     },
     reason: {
       type: String,
@@ -92,7 +168,7 @@ appointmentSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      status: { $in: ['scheduled', 'rescheduled', 'auto-assigned'] },
+      status: { $in: ['pending_payment', 'confirmed', 'scheduled', 'rescheduled', 'auto-assigned'] },
     },
   }
 );
@@ -102,7 +178,7 @@ appointmentSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      status: { $in: ['scheduled', 'rescheduled', 'auto-assigned'] },
+      status: { $in: ['pending_payment', 'confirmed', 'scheduled', 'rescheduled', 'auto-assigned'] },
     },
   }
 );

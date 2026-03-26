@@ -11,7 +11,13 @@ import {
 } from '../utils/aiScheduler.js';
 import { createNotification } from '../utils/notificationService.js';
 
-const ACTIVE_APPOINTMENT_STATUSES = ['scheduled', 'rescheduled', 'auto-assigned'];
+const ACTIVE_APPOINTMENT_STATUSES = [
+  'pending_payment',
+  'confirmed',
+  'scheduled',
+  'rescheduled',
+  'auto-assigned',
+];
 
 const ensurePatientRole = (user) => user?.role === 'patient';
 
@@ -188,12 +194,30 @@ export const bookAppointment = async (req, res, next) => {
       });
     }
 
+    console.log('[BookingDebug] Doctor booking request', {
+      doctorId: doctor._id.toString(),
+      availabilityStatus: doctor.availabilityStatus,
+      isAvailable: doctor.isAvailable,
+      availableSlots: doctor.availableSlots,
+      appointmentDate,
+      startTime,
+      endTime,
+    });
+
     const slotAvailable = await isDoctorAvailableForSlot({
       doctor,
       appointmentDate,
       startTime,
       endTime,
       patientId: req.user._id,
+    });
+
+    console.log('[BookingDebug] Slot availability result', {
+      doctorId: doctor._id.toString(),
+      appointmentDate,
+      startTime,
+      endTime,
+      slotAvailable,
     });
 
     if (!slotAvailable) {
@@ -271,8 +295,8 @@ export const getMyAppointments = async (req, res, next) => {
           : {};
 
     const appointments = await Appointment.find(query)
-      .populate('patient', 'firstName lastName email phone')
-      .populate('doctor', 'firstName lastName specialization availabilityStatus')
+      .populate('patient', 'firstName lastName email phone profileImage')
+      .populate('doctor', 'firstName lastName specialization availabilityStatus consultationFee profileImage rating ratingsCount')
       .sort({ appointmentDate: 1, startTime: 1 });
 
     return res.status(200).json({
@@ -572,6 +596,36 @@ export const getNotifications = async (req, res, next) => {
       success: true,
       data: {
         notifications,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const markNotificationAsRead = async (req, res, next) => {
+  try {
+    const notification = await Notification.findOneAndUpdate(
+      { _id: req.params.id, recipient: req.user._id },
+      { isRead: true },
+      { new: true }
+    );
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'NOTIFICATION_NOT_FOUND',
+          message: 'Notification not found',
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Notification marked as read',
+      data: {
+        notification,
       },
     });
   } catch (error) {

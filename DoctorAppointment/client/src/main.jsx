@@ -6,6 +6,8 @@ import { setStore } from './services/api';
 import './index.css';
 import App from './App.jsx';
 
+
+
 // Set store for API interceptors
 setStore(store);
 

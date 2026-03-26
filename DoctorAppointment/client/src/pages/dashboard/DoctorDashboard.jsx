@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../redux/slices/authSlice';
+import Avatar from '../../components/common/Avatar';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
+import NotificationBell from '../../components/common/NotificationBell';
 import {
   clearAppointmentError,
   clearAppointmentSuccess,
@@ -47,20 +49,45 @@ const DoctorDashboard = () => {
       <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-6 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-bold text-gray-900">Doctor Dashboard</h1>
-          <Button onClick={handleLogout} variant="outline" size="sm">
-            Logout
-          </Button>
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            <div className="hidden items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-sm sm:flex">
+              <Avatar
+                src={user?.profileImage}
+                name={`${user?.firstName || ''} ${user?.lastName || ''}`}
+                size="sm"
+              />
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  Dr. {user?.firstName} {user?.lastName}
+                </p>
+                <p className="text-xs text-slate-500">{user?.specialization}</p>
+              </div>
+            </div>
+            <Button onClick={handleLogout} variant="outline" size="sm">
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-2 text-2xl font-semibold text-gray-900">
-            Dr. {user?.firstName} {user?.lastName}
-          </h2>
-          <p className="text-gray-600">Specialization: {user?.specialization}</p>
-          <p className="text-gray-600">Email: {user?.email}</p>
-          <p className="text-gray-600">Phone: {user?.phone}</p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <Avatar
+              src={user?.profileImage}
+              name={`${user?.firstName || ''} ${user?.lastName || ''}`}
+              size="xl"
+            />
+            <div>
+              <h2 className="mb-2 text-2xl font-semibold text-gray-900">
+                Dr. {user?.firstName} {user?.lastName}
+              </h2>
+              <p className="text-gray-600">Specialization: {user?.specialization}</p>
+              <p className="text-gray-600">Email: {user?.email}</p>
+              <p className="text-gray-600">Phone: {user?.phone}</p>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -164,13 +191,22 @@ const DoctorDashboard = () => {
               ) : (
                 doctorSchedule.map((appointment) => (
                   <div key={appointment._id} className="rounded-2xl border border-green-100 bg-white p-4">
-                    <p className="font-semibold text-gray-900">
-                      {appointment.patient?.firstName} {appointment.patient?.lastName}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {new Date(appointment.appointmentDate).toLocaleDateString()} | {appointment.startTime} - {appointment.endTime}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500">Status: {appointment.status}</p>
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        src={appointment.patient?.profileImage}
+                        name={`${appointment.patient?.firstName || ''} ${appointment.patient?.lastName || ''}`}
+                        size="sm"
+                      />
+                      <div>
+                        <p className="font-semibold text-gray-900">
+                          {appointment.patient?.firstName} {appointment.patient?.lastName}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {new Date(appointment.appointmentDate).toLocaleDateString()} | {appointment.startTime} - {appointment.endTime}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">Status: {appointment.status}</p>
+                      </div>
+                    </div>
                   </div>
                 ))
               )}

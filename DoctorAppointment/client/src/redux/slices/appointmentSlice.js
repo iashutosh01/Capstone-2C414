@@ -8,8 +8,11 @@ const initialState = {
   doctorSchedule: [],
   adminStats: null,
   doctorUtilization: [],
+  pendingPaymentOrder: null,
+  couponPreview: null,
   loading: false,
   actionLoading: false,
+  couponLoading: false,
   error: null,
   successMessage: null,
 };
@@ -26,6 +29,42 @@ export const bookAppointment = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(getErrorMessage(error, 'Failed to book appointment'));
+    }
+  }
+);
+
+export const createPaymentOrder = createAsyncThunk(
+  'appointments/createPaymentOrder',
+  async (payload, { rejectWithValue }) => {
+    try {
+      const response = await api.post('/payments/create-order', payload);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(getErrorMessage(error, 'Failed to create payment order'));
+    }
+  }
+);
+
+export const applyCoupon = createAsyncThunk(
+  'appointments/applyCoupon',
+  async (payload, { rejectWithValue }) => {
+    try {
+      const response = await api.post('/payments/apply-coupon', payload);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(getErrorMessage(error, 'Failed to apply coupon'));
+    }
+  }
+);
+
+export const verifyAppointmentPayment = createAsyncThunk(
+  'appointments/verifyAppointmentPayment',
+  async (payload, { rejectWithValue }) => {
+    try {
+      const response = await api.post('/payments/verify', payload);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(getErrorMessage(error, 'Failed to verify appointment payment'));
     }
   }
 );
@@ -76,6 +115,18 @@ export const getNotifications = createAsyncThunk(
       return response.data.data.notifications;
     } catch (error) {
       return rejectWithValue(getErrorMessage(error, 'Failed to fetch notifications'));
+    }
+  }
+);
+
+export const markNotificationAsRead = createAsyncThunk(
+  'appointments/markNotificationAsRead',
+  async (id, { rejectWithValue }) => {
+    try {
+      const response = await api.patch(`/appointments/notifications/${id}/read`);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(getErrorMessage(error, 'Failed to update notification'));
     }
   }
 );
@@ -150,6 +201,9 @@ const appointmentSlice = createSlice({
     clearAppointmentSuccess: (state) => {
       state.successMessage = null;
     },
+    clearCouponPreview: (state) => {
+      state.couponPreview = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -167,6 +221,54 @@ const appointmentSlice = createSlice({
         }
       })
       .addCase(bookAppointment.rejected, (state, action) => {
+        state.actionLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(createPaymentOrder.pending, (state) => {
+        state.actionLoading = true;
+        state.error = null;
+        state.successMessage = null;
+      })
+      .addCase(createPaymentOrder.fulfilled, (state, action) => {
+        state.actionLoading = false;
+        state.successMessage = action.payload.message;
+        state.pendingPaymentOrder = action.payload.data.order
+          ? action.payload.data
+          : null;
+      })
+      .addCase(createPaymentOrder.rejected, (state, action) => {
+        state.actionLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(applyCoupon.pending, (state) => {
+        state.couponLoading = true;
+        state.error = null;
+        state.successMessage = null;
+      })
+      .addCase(applyCoupon.fulfilled, (state, action) => {
+        state.couponLoading = false;
+        state.couponPreview = action.payload.data;
+        state.successMessage = action.payload.message;
+      })
+      .addCase(applyCoupon.rejected, (state, action) => {
+        state.couponLoading = false;
+        state.couponPreview = null;
+        state.error = action.payload;
+      })
+      .addCase(verifyAppointmentPayment.pending, (state) => {
+        state.actionLoading = true;
+        state.error = null;
+      })
+      .addCase(verifyAppointmentPayment.fulfilled, (state, action) => {
+        state.actionLoading = false;
+        state.successMessage = action.payload.message;
+        state.pendingPaymentOrder = null;
+
+        if (action.payload.data.appointment) {
+          state.appointments = [action.payload.data.appointment, ...state.appointments];
+        }
+      })
+      .addCase(verifyAppointmentPayment.rejected, (state, action) => {
         state.actionLoading = false;
         state.error = action.payload;
       })
@@ -226,6 +328,15 @@ const appointmentSlice = createSlice({
         state.notifications = action.payload;
       })
       .addCase(getNotifications.rejected, (state, action) => {
+        state.error = action.payload;
+      })
+      .addCase(markNotificationAsRead.fulfilled, (state, action) => {
+        const updatedNotification = action.payload.data.notification;
+        state.notifications = state.notifications.map((notification) =>
+          notification._id === updatedNotification._id ? updatedNotification : notification
+        );
+      })
+      .addCase(markNotificationAsRead.rejected, (state, action) => {
         state.error = action.payload;
       })
       .addCase(getDoctors.pending, (state) => {
@@ -295,6 +406,7 @@ const appointmentSlice = createSlice({
   },
 });
 
-export const { clearAppointmentError, clearAppointmentSuccess } = appointmentSlice.actions;
+export const { clearAppointmentError, clearAppointmentSuccess, clearCouponPreview } =
+  appointmentSlice.actions;
 
 export default appointmentSlice.reducer;

@@ -3,16 +3,54 @@ import Waitlist from '../models/Waitlist.js';
 import User from '../models/User.js';
 import { createNotification } from './notificationService.js';
 
-const ACTIVE_APPOINTMENT_STATUSES = ['scheduled', 'rescheduled', 'auto-assigned'];
+const ACTIVE_APPOINTMENT_STATUSES = [
+  'pending_payment',
+  'confirmed',
+  'scheduled',
+  'rescheduled',
+  'auto-assigned',
+];
+
+const normalizeTime = (value = '') => {
+  const [rawHours = '0', rawMinutes = '0'] = String(value).split(':');
+  const hours = rawHours.padStart(2, '0');
+  const minutes = rawMinutes.padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
+const toMinutes = (value) => {
+  const [hours, minutes] = normalizeTime(value).split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+const parseDateInput = (value) => {
+  if (value instanceof Date) {
+    return new Date(value);
+  }
+
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  return new Date(value);
+};
 
 const getDayName = (date) => {
-  return new Date(date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+  return parseDateInput(date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
 };
 
 const normalizeDate = (value) => {
-  const date = new Date(value);
+  const date = parseDateInput(value);
   date.setHours(0, 0, 0, 0);
   return date;
+};
+
+const getDayRange = (value) => {
+  const start = normalizeDate(value);
+  const end = new Date(start);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
 };
 
 export const calculatePriorityScore = ({
@@ -24,19 +62,33 @@ export const calculatePriorityScore = ({
 };
 
 export const isTimeRangeValid = (startTime, endTime) => {
-  return Boolean(startTime && endTime && startTime < endTime);
+  return Boolean(startTime && endTime && toMinutes(startTime) < toMinutes(endTime));
 };
 
 export const isDoctorSlotWithinAvailability = (doctor, appointmentDate, startTime, endTime) => {
   const dayName = getDayName(appointmentDate);
+  const normalizedStartTime = normalizeTime(startTime);
+  const normalizedEndTime = normalizeTime(endTime);
 
-  return doctor.availableSlots.some(
+  const matchedSlot = doctor.availableSlots.find(
     (slot) =>
       slot.isActive !== false &&
       slot.day === dayName &&
-      slot.startTime <= startTime &&
-      slot.endTime >= endTime
+      toMinutes(slot.startTime) <= toMinutes(normalizedStartTime) &&
+      toMinutes(slot.endTime) >= toMinutes(normalizedEndTime)
   );
+
+  console.log('[BookingDebug] Availability slot check', {
+    doctorId: doctor._id?.toString(),
+    appointmentDate: normalizeDate(appointmentDate).toISOString(),
+    requestedDay: dayName,
+    requestedStartTime: normalizedStartTime,
+    requestedEndTime: normalizedEndTime,
+    doctorSlots: doctor.availableSlots,
+    matchedSlot: matchedSlot || null,
+  });
+
+  return Boolean(matchedSlot);
 };
 
 export const canDoctorAcceptAppointments = (doctor) => {
@@ -64,15 +116,30 @@ export const isDoctorAvailableForSlot = async ({
   }
 
   if (!isDoctorSlotWithinAvailability(doctor, appointmentDate, startTime, endTime)) {
+    console.log('[BookingDebug] Doctor slot unavailable', {
+      doctorId: doctor._id?.toString(),
+      appointmentDate,
+      startTime: normalizeTime(startTime),
+      endTime: normalizeTime(endTime),
+      availabilityStatus: doctor.availabilityStatus,
+      isAvailable: doctor.isAvailable,
+    });
     return false;
   }
 
-  const normalizedDate = normalizeDate(appointmentDate);
+  const { start: dayStart, end: dayEnd } = getDayRange(appointmentDate);
+  const normalizedStartTime = normalizeTime(startTime);
+  const normalizedEndTime = normalizeTime(endTime);
 
   const doctorConflictQuery = {
     doctor: doctor._id,
-    appointmentDate: normalizedDate,
-    startTime,
+    appointmentDate: { $gte: dayStart, $lte: dayEnd },
+    $expr: {
+      $and: [
+        { $lt: [{ $toInt: { $replaceAll: { input: '$startTime', find: ':', replacement: '' } } }, Number(normalizedEndTime.replace(':', ''))] },
+        { $gt: [{ $toInt: { $replaceAll: { input: '$endTime', find: ':', replacement: '' } } }, Number(normalizedStartTime.replace(':', ''))] },
+      ],
+    },
     status: { $in: ACTIVE_APPOINTMENT_STATUSES },
   };
   const queries = [Appointment.findOne(doctorConflictQuery)];
@@ -84,8 +151,13 @@ export const isDoctorAvailableForSlot = async ({
   if (patientId) {
     const patientConflictQuery = {
       patient: patientId,
-      appointmentDate: normalizedDate,
-      startTime,
+      appointmentDate: { $gte: dayStart, $lte: dayEnd },
+      $expr: {
+        $and: [
+          { $lt: [{ $toInt: { $replaceAll: { input: '$startTime', find: ':', replacement: '' } } }, Number(normalizedEndTime.replace(':', ''))] },
+          { $gt: [{ $toInt: { $replaceAll: { input: '$endTime', find: ':', replacement: '' } } }, Number(normalizedStartTime.replace(':', ''))] },
+        ],
+      },
       status: { $in: ACTIVE_APPOINTMENT_STATUSES },
     };
 
@@ -97,6 +169,28 @@ export const isDoctorAvailableForSlot = async ({
   }
 
   const [doctorConflict, patientConflict] = await Promise.all(queries);
+
+  console.log('[BookingDebug] Conflict check', {
+    doctorId: doctor._id?.toString(),
+    patientId: patientId?.toString?.() || patientId || null,
+    appointmentDate: normalizeDate(appointmentDate).toISOString(),
+    requestedStartTime: normalizedStartTime,
+    requestedEndTime: normalizedEndTime,
+    doctorConflict: doctorConflict
+      ? {
+          id: doctorConflict._id.toString(),
+          startTime: doctorConflict.startTime,
+          endTime: doctorConflict.endTime,
+        }
+      : null,
+    patientConflict: patientConflict
+      ? {
+          id: patientConflict._id.toString(),
+          startTime: patientConflict.startTime,
+          endTime: patientConflict.endTime,
+        }
+      : null,
+  });
 
   return !doctorConflict && !patientConflict;
 };

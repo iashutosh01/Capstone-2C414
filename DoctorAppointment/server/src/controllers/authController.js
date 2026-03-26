@@ -13,7 +13,7 @@ const generateVerificationToken = () => {
   return {
     rawToken,
     hashedToken,
-    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+    expiresAt: Date.now() + 15 * 60 * 1000,
   };
 };
 
@@ -68,11 +68,7 @@ export const register = async (req, res, next) => {
       ...otherFields,
     });
 
-    await sendVerificationEmail({
-      email: user.email,
-      firstName: user.firstName,
-      verificationToken: rawToken,
-    });
+    await sendVerificationEmail(user.email, rawToken, user.firstName);
 
     return res.status(201).json({
       success: true,
@@ -237,7 +233,18 @@ export const googleOAuthLogin = async (req, res, next) => {
 
 export const verifyEmail = async (req, res, next) => {
   try {
-    const { token } = req.params;
+    const token = req.query.token || req.params.token;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'TOKEN_REQUIRED',
+          message: 'Verification token is required',
+        },
+      });
+    }
+
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
     const user = await User.findOne({
@@ -300,11 +307,7 @@ export const resendVerificationEmail = async (req, res, next) => {
     user.emailVerificationExpires = expiresAt;
     await user.save();
 
-    await sendVerificationEmail({
-      email: user.email,
-      firstName: user.firstName,
-      verificationToken: rawToken,
-    });
+    await sendVerificationEmail(user.email, rawToken, user.firstName);
 
     return res.status(200).json({
       success: true,

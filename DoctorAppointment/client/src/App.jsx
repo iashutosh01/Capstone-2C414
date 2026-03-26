@@ -7,11 +7,14 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
+import OAuthSuccess from './pages/auth/OAuthSuccess';
 import VerifyEmail from './pages/auth/VerifyEmail';
 import PatientDashboard from './pages/dashboard/PatientDashboard';
 import DoctorDashboard from './pages/dashboard/DoctorDashboard';
 import AdminDashboard from './pages/dashboard/AdminDashboard';
 import BookAppointment from './pages/appointments/BookAppointment';
+import BookingSuccess from './pages/appointments/BookingSuccess';
+import Invoice from './pages/appointments/Invoice';
 import PatientAppointments from './pages/appointments/PatientAppointments';
 
 // Components
@@ -42,6 +45,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
+        <Route path="/oauth-success" element={<OAuthSuccess />} />
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
 
         {/* Protected Routes - Patient */}
@@ -66,6 +70,22 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['patient']}>
               <PatientAppointments />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patient/invoice/:appointmentId"
+          element={
+            <ProtectedRoute allowedRoles={['patient']}>
+              <Invoice />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patient/booking-success/:appointmentId"
+          element={
+            <ProtectedRoute allowedRoles={['patient']}>
+              <BookingSuccess />
             </ProtectedRoute>
           }
         />

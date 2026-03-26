@@ -1,5 +1,6 @@
 import express from 'express';
 import { body } from 'express-validator';
+import passport from '../config/passport.js';
 import {
   register,
   login,
@@ -14,6 +15,7 @@ import {
 } from '../controllers/authController.js';
 import { protect } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
+import { generateTokens } from '../utils/generateToken.js';
 
 const router = express.Router();
 
@@ -63,7 +65,40 @@ const resetPasswordValidation = [
 
 router.post('/register', registerValidation, validate, register);
 router.post('/login', loginValidation, validate, login);
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+router.get(
+  '/google/callback',
+  passport.authenticate('google', {
+    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:5173'}/login?error=google_auth_failed`,
+  }),
+  async (req, res, next) => {
+    try {
+      const { accessToken, refreshToken } = generateTokens(req.user._id.toString(), req.user.role);
+
+      req.user.refreshToken = refreshToken;
+      req.user.lastLogin = Date.now();
+      await req.user.save();
+
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      const oauthSuccessUrl =
+        process.env.OAUTH_SUCCESS_URL || 'http://localhost:3000/oauth-success';
+
+      return res.redirect(
+        `${oauthSuccessUrl}?token=${encodeURIComponent(accessToken)}`
+      );
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
 router.post('/oauth/google', googleOAuthLogin);
+router.get('/verify-email', verifyEmail);
 router.get('/verify-email/:token', verifyEmail);
 router.post('/resend-verification', resendVerificationValidation, validate, resendVerificationEmail);
 router.post('/forgot-password', forgotPasswordValidation, validate, forgotPassword);

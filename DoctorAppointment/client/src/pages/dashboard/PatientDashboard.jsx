@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { logout } from '../../redux/slices/authSlice';
+import Avatar from '../../components/common/Avatar';
 import Button from '../../components/common/Button';
 import NotificationBell from '../../components/common/NotificationBell';
 import { getMyAppointments, getNotifications } from '../../redux/slices/appointmentSlice';
@@ -31,6 +32,19 @@ const PatientDashboard = () => {
           <h1 className="text-3xl font-bold text-gray-900">Patient Dashboard</h1>
           <div className="flex items-center gap-3">
             <NotificationBell />
+            <div className="hidden items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-sm sm:flex">
+              <Avatar
+                src={user?.profileImage}
+                name={`${user?.firstName || ''} ${user?.lastName || ''}`}
+                size="sm"
+              />
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  {user?.firstName} {user?.lastName}
+                </p>
+                <p className="text-xs text-slate-500">Patient</p>
+              </div>
+            </div>
             <Button onClick={handleLogout} variant="outline" size="sm">
               Logout
             </Button>
@@ -40,11 +54,20 @@ const PatientDashboard = () => {
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-2 text-2xl font-semibold text-gray-900">
-            Welcome back, {user?.firstName} {user?.lastName}!
-          </h2>
-          <p className="text-gray-600">Email: {user?.email}</p>
-          <p className="text-gray-600">Phone: {user?.phone}</p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <Avatar
+              src={user?.profileImage}
+              name={`${user?.firstName || ''} ${user?.lastName || ''}`}
+              size="xl"
+            />
+            <div>
+              <h2 className="mb-2 text-2xl font-semibold text-gray-900">
+                Welcome back, {user?.firstName} {user?.lastName}!
+              </h2>
+              <p className="text-gray-600">Email: {user?.email}</p>
+              <p className="text-gray-600">Phone: {user?.phone}</p>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">

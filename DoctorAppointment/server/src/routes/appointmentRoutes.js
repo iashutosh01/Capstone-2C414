@@ -4,6 +4,7 @@ import {
   cancelAppointment,
   getMyAppointments,
   getNotifications,
+  markNotificationAsRead,
   rescheduleAppointment,
 } from '../controllers/appointmentController.js';
 import { authorize, protect } from '../middleware/auth.js';
@@ -11,6 +12,7 @@ import { authorize, protect } from '../middleware/auth.js';
 const router = express.Router();
 
 router.get('/notifications', protect, getNotifications);
+router.patch('/notifications/:id/read', protect, markNotificationAsRead);
 router.get('/my', protect, authorize('patient'), getMyAppointments);
 router.post('/book', protect, authorize('patient'), bookAppointment);
 router.put('/reschedule/:id', protect, authorize('patient'), rescheduleAppointment);

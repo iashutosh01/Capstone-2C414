@@ -52,6 +52,11 @@ const userSchema = new mongoose.Schema(
     emailVerificationExpires: Date,
     resetPasswordToken: String,
     resetPasswordExpires: Date,
+    profileImage: {
+      type: String,
+      trim: true,
+      default: '',
+    },
 
     // Patient-specific fields
     dateOfBirth: {
@@ -114,6 +119,17 @@ const userSchema = new mongoose.Schema(
       required: function () {
         return this.role === 'doctor';
       },
+    },
+    rating: {
+      type: Number,
+      min: [0, 'Rating cannot be less than 0'],
+      max: [5, 'Rating cannot be more than 5'],
+      default: 4.0,
+    },
+    ratingsCount: {
+      type: Number,
+      min: [0, 'Ratings count cannot be negative'],
+      default: 0,
     },
     availableSlots: [
       {

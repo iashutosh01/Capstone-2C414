@@ -17,7 +17,7 @@ export const getDoctors = async (req, res, next) => {
     }
 
     const doctors = await User.find(query).select(
-      'firstName lastName email phone specialization experience consultationFee department availableSlots availabilityStatus isAvailable'
+      'firstName lastName email phone specialization experience consultationFee department availableSlots availabilityStatus isAvailable profileImage rating ratingsCount'
     );
 
     return res.status(200).json({
@@ -108,9 +108,9 @@ export const getDoctorSchedule = async (req, res, next) => {
   try {
     const schedule = await Appointment.find({
       doctor: req.user._id,
-      status: { $in: ['scheduled', 'rescheduled', 'auto-assigned'] },
+      status: { $in: ['pending_payment', 'confirmed', 'scheduled', 'rescheduled', 'auto-assigned'] },
     })
-      .populate('patient', 'firstName lastName email phone')
+      .populate('patient', 'firstName lastName email phone profileImage')
       .sort({ appointmentDate: 1, startTime: 1 });
 
     return res.status(200).json({

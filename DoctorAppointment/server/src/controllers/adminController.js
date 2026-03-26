@@ -1,4 +1,5 @@
 import Appointment from '../models/Appointment.js';
+import Coupon from '../models/Coupon.js';
 import User from '../models/User.js';
 import Waitlist from '../models/Waitlist.js';
 
@@ -29,7 +30,7 @@ export const getDoctorUtilization = async (req, res, next) => {
   try {
     const doctors = await User.find({ role: 'doctor' }).select('_id firstName lastName specialization');
     const appointments = await Appointment.find({
-      status: { $in: ['scheduled', 'rescheduled', 'auto-assigned', 'completed'] },
+      status: { $in: ['pending_payment', 'confirmed', 'scheduled', 'rescheduled', 'auto-assigned', 'completed'] },
     }).select('doctor');
 
     const totalAssigned = appointments.length;
@@ -99,6 +100,105 @@ export const getDoctorsOverview = async (req, res, next) => {
       success: true,
       data: {
         doctors,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const createCoupon = async (req, res, next) => {
+  try {
+    const coupon = await Coupon.create({
+      ...req.body,
+      code: String(req.body.code || '').trim().toUpperCase(),
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Coupon created successfully',
+      data: {
+        coupon,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getCoupons = async (req, res, next) => {
+  try {
+    const coupons = await Coupon.find().sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        coupons,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const updateCoupon = async (req, res, next) => {
+  try {
+    const updateData = { ...req.body };
+
+    if (updateData.code) {
+      updateData.code = String(updateData.code).trim().toUpperCase();
+    }
+
+    const coupon = await Coupon.findByIdAndUpdate(req.params.id, updateData, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!coupon) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'COUPON_NOT_FOUND',
+          message: 'Coupon not found',
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Coupon updated successfully',
+      data: {
+        coupon,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const deactivateCoupon = async (req, res, next) => {
+  try {
+    const coupon = await Coupon.findByIdAndUpdate(
+      req.params.id,
+      { isActive: false },
+      { new: true }
+    );
+
+    if (!coupon) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'COUPON_NOT_FOUND',
+          message: 'Coupon not found',
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Coupon deactivated successfully',
+      data: {
+        coupon,
       },
     });
   } catch (error) {

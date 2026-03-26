@@ -4,11 +4,16 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import session from 'express-session';
+import http from 'http';
+import { Server } from 'socket.io';
 import connectDB from './config/db.js';
+import passport from './config/passport.js';
 import authRoutes from './routes/authRoutes.js';
 import appointmentRoutes from './routes/appointmentRoutes.js';
 import doctorRoutes from './routes/doctorRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
 import errorHandler, { notFound } from './middleware/errorHandler.js';
 
 // Load environment variables
@@ -16,6 +21,14 @@ dotenv.config();
 
 // Create Express app
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+});
 
 // Connect to MongoDB
 connectDB();
@@ -32,6 +45,23 @@ app.use(cors(corsOptions));
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 app.use(cookieParser()); // Parse cookies
+app.use(
+  session({
+    secret:
+      process.env.SESSION_SECRET ||
+      process.env.JWT_REFRESH_SECRET ||
+      'ai-medicare-session-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000,
+    },
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Logging middleware (only in development)
 if (process.env.NODE_ENV === 'development') {
@@ -89,6 +119,12 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/payments', paymentRoutes);
+
+// Socket.io connection
+io.on('connection', (socket) => {
+  console.log('A user connected:', socket.id);
+});
 
 // 404 handler - must be after all routes
 app.use(notFound);
@@ -99,7 +135,7 @@ app.use(errorHandler);
 // Start server
 const PORT = process.env.PORT || 3000;
 
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
 
@@ -115,4 +151,4 @@ process.on('uncaughtException', () => {
   process.exit(1);
 });
 
-export default app;
+export { app, io };

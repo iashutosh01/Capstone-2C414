@@ -2,8 +2,10 @@ import { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../redux/slices/authSlice';
+import Avatar from '../../components/common/Avatar';
 import Button from '../../components/common/Button';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+import NotificationBell from '../../components/common/NotificationBell';
 import {
   getAdminDashboardStats,
   getDoctorUtilization,
@@ -32,20 +34,45 @@ const AdminDashboard = () => {
       <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-6 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <Button onClick={handleLogout} variant="outline" size="sm">
-            Logout
-          </Button>
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            <div className="hidden items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-sm sm:flex">
+              <Avatar
+                src={user?.profileImage}
+                name={`${user?.firstName || ''} ${user?.lastName || ''}`}
+                size="sm"
+              />
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  {user?.firstName} {user?.lastName}
+                </p>
+                <p className="text-xs text-slate-500">Administrator</p>
+              </div>
+            </div>
+            <Button onClick={handleLogout} variant="outline" size="sm">
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-2 text-2xl font-semibold text-gray-900">
-            {user?.firstName} {user?.lastName}
-          </h2>
-          <p className="text-gray-600">Department: {user?.department}</p>
-          <p className="text-gray-600">Email: {user?.email}</p>
-          <p className="text-gray-600">Role: Administrator</p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <Avatar
+              src={user?.profileImage}
+              name={`${user?.firstName || ''} ${user?.lastName || ''}`}
+              size="xl"
+            />
+            <div>
+              <h2 className="mb-2 text-2xl font-semibold text-gray-900">
+                {user?.firstName} {user?.lastName}
+              </h2>
+              <p className="text-gray-600">Department: {user?.department}</p>
+              <p className="text-gray-600">Email: {user?.email}</p>
+              <p className="text-gray-600">Role: Administrator</p>
+            </div>
+          </div>
         </div>
 
         {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}

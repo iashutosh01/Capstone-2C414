@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import Avatar from '../components/common/Avatar';
 import Button from '../components/common/Button';
 
 const Landing = () => {
@@ -34,9 +35,24 @@ const Landing = () => {
             </Link>
             <div className="flex items-center space-x-2 sm:space-x-4">
               {isAuthenticated ? (
-                <Link to={getDashboardRoute()}>
-                  <Button variant="primary" size="md">Dashboard</Button>
-                </Link>
+                <div className="flex items-center gap-3">
+                  <div className="hidden items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-sm sm:flex">
+                    <Avatar
+                      src={user?.profileImage}
+                      name={`${user?.firstName || ''} ${user?.lastName || ''}`}
+                      size="sm"
+                    />
+                    <div className="text-left">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {user?.firstName} {user?.lastName}
+                      </p>
+                      <p className="text-xs text-slate-500 capitalize">{user?.role}</p>
+                    </div>
+                  </div>
+                  <Link to={getDashboardRoute()}>
+                    <Button variant="primary" size="md">Dashboard</Button>
+                  </Link>
+                </div>
               ) : (
                 <>
                   <Link to="/login">

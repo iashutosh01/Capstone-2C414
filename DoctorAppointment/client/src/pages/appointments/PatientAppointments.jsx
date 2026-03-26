@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
+import Avatar from '../../components/common/Avatar';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -16,6 +17,7 @@ import {
 
 const PatientAppointments = () => {
   const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
   const { appointments, notifications, loading, actionLoading, error, successMessage } =
     useSelector((state) => state.appointments);
   const [rescheduleData, setRescheduleData] = useState({});
@@ -53,6 +55,19 @@ const PatientAppointments = () => {
           </div>
           <div className="flex items-center gap-3">
             <NotificationBell />
+            <div className="hidden items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-sm sm:flex">
+              <Avatar
+                src={user?.profileImage}
+                name={`${user?.firstName || ''} ${user?.lastName || ''}`}
+                size="sm"
+              />
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  {user?.firstName} {user?.lastName}
+                </p>
+                <p className="text-xs text-slate-500">Patient</p>
+              </div>
+            </div>
             <Link to="/patient/book">
               <Button variant="primary">Book New</Button>
             </Link>
@@ -90,18 +105,33 @@ const PatientAppointments = () => {
                 appointments.map((appointment) => (
                   <div key={appointment._id} className="rounded-2xl border border-slate-200 p-4">
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="text-lg font-semibold text-gray-900">
-                          Dr. {appointment.doctor?.firstName} {appointment.doctor?.lastName}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {new Date(appointment.appointmentDate).toLocaleDateString()} |{' '}
-                          {appointment.startTime} - {appointment.endTime}
-                        </p>
-                        <p className="text-sm text-gray-600">Status: {appointment.status}</p>
-                        <p className="text-sm text-gray-600">Reason: {appointment.reason}</p>
+                      <div className="flex items-start gap-4">
+                        <Avatar
+                          src={appointment.doctor?.profileImage}
+                          name={`${appointment.doctor?.firstName || ''} ${appointment.doctor?.lastName || ''}`}
+                          size="md"
+                        />
+                        <div>
+                          <p className="text-lg font-semibold text-gray-900">
+                            Dr. {appointment.doctor?.firstName} {appointment.doctor?.lastName}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {new Date(appointment.appointmentDate).toLocaleDateString()} |{' '}
+                            {appointment.startTime} - {appointment.endTime}
+                          </p>
+                          <p className="text-sm text-gray-600">Status: {appointment.status}</p>
+                          <p className="text-sm text-gray-600">Reason: {appointment.reason}</p>
+                          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-400">
+                            Appointment ID: {appointment._id}
+                          </p>
+                        </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        <Link to={`/patient/invoice/${appointment._id}`}>
+                          <Button variant="outline" size="sm">
+                            View Receipt
+                          </Button>
+                        </Link>
                         <Button
                           variant="danger"
                           size="sm"
