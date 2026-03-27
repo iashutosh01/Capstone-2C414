@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { logout } from '../../redux/slices/authSlice';
 import Avatar from '../../components/common/Avatar';
 import Button from '../../components/common/Button';
@@ -191,21 +191,38 @@ const DoctorDashboard = () => {
               ) : (
                 doctorSchedule.map((appointment) => (
                   <div key={appointment._id} className="rounded-2xl border border-green-100 bg-white p-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar
-                        src={appointment.patient?.profileImage}
-                        name={`${appointment.patient?.firstName || ''} ${appointment.patient?.lastName || ''}`}
-                        size="sm"
-                      />
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          {appointment.patient?.firstName} {appointment.patient?.lastName}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {new Date(appointment.appointmentDate).toLocaleDateString()} | {appointment.startTime} - {appointment.endTime}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500">Status: {appointment.status}</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          src={appointment.patient?.profileImage}
+                          name={`${appointment.patient?.firstName || ''} ${appointment.patient?.lastName || ''}`}
+                          size="sm"
+                        />
+                        <div>
+                          <p className="font-semibold text-gray-900">
+                            {appointment.patient?.firstName} {appointment.patient?.lastName}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {new Date(appointment.appointmentDate).toLocaleDateString()} | {appointment.startTime} - {appointment.endTime}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-500">Status: {appointment.status}</p>
+                        </div>
                       </div>
+                      {appointment.status === 'confirmed' && (
+                        <Link
+                          to={`/chat/${appointment._id}`}
+                          state={{ 
+                            patientName: `${appointment.patient?.firstName} ${appointment.patient?.lastName}`,
+                            doctorName: `Dr. ${user?.firstName} ${user?.lastName}`,
+                            patientId: appointment.patient?._id,
+                            doctorId: user?._id,
+                          }}
+                        >
+                          <Button variant="outline" size="sm">
+                            Chat
+                          </Button>
+                        </Link>
+                      )}
                     </div>
                   </div>
                 ))

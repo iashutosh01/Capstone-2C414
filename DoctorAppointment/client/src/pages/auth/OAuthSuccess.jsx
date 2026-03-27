@@ -5,7 +5,7 @@ import axios from 'axios';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { clearCredentials, setCredentials } from '../../redux/slices/authSlice';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const OAuthSuccess = () => {
   const dispatch = useDispatch();
@@ -16,6 +16,8 @@ const OAuthSuccess = () => {
     const completeOAuthLogin = async () => {
       const token = new URLSearchParams(location.search).get('token');
 
+      console.log('[AuthDebug] OAuth token extraction', { token });
+
       if (!token) {
         dispatch(clearCredentials());
         navigate('/login?error=missing_oauth_token', { replace: true });
@@ -24,6 +26,9 @@ const OAuthSuccess = () => {
 
       try {
         localStorage.setItem('accessToken', token);
+        console.log('[AuthDebug] OAuth token stored', {
+          accessToken: localStorage.getItem('accessToken'),
+        });
 
         const response = await axios.get(`${API_URL}/auth/me`, {
           headers: {
@@ -35,6 +40,7 @@ const OAuthSuccess = () => {
         const user = response.data.data.user;
         localStorage.setItem('user', JSON.stringify(user));
         dispatch(setCredentials({ user, accessToken: token }));
+        console.log('[AuthDebug] OAuth user stored', { user });
 
         const dashboardRoutes = {
           patient: '/patient/dashboard',
@@ -42,8 +48,15 @@ const OAuthSuccess = () => {
           admin: '/admin/dashboard',
         };
 
-        navigate(dashboardRoutes[user.role] || '/', { replace: true });
+        const redirectPath = dashboardRoutes[user.role] || '/';
+        console.log('[AuthDebug] Redirect execution after OAuth', {
+          role: user.role,
+          redirectPath,
+        });
+
+        navigate(redirectPath, { replace: true });
       } catch (error) {
+        console.error('[AuthDebug] OAuth completion failed', error);
         dispatch(clearCredentials());
         navigate('/login?error=oauth_login_failed', { replace: true });
       }

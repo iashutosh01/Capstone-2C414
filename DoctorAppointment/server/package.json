@@ -1,7 +1,7 @@
 {
-  "name": "hospital-appointment-server",
+  "name": "Doctor-appointment-server",
   "version": "1.0.0",
-  "description": "Backend server for Hospital Appointment Management System with AI-based scheduling",
+  "description": "Backend server for Doctor Appointment Management System with AI-based scheduling",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
-    "hospital",
+    "Doctor",
     "appointment",
     "healthcare",
     "ai-scheduling"

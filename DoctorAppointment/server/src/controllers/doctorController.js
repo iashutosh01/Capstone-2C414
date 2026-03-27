@@ -31,7 +31,7 @@ export const getDoctors = async (req, res, next) => {
   }
 };
 
-export const updateAvailability = async (req, res, next) => {
+export const updateDoctorAvailability = async (req, res, next) => {
   try {
     const { availabilityStatus, availableSlots, slotDate, startTime, endTime, availabilityNotes = '' } = req.body;
 
@@ -101,8 +101,6 @@ export const updateAvailability = async (req, res, next) => {
     return next(error);
   }
 };
-
-export const updateAvailabilityStatus = updateAvailability;
 
 export const getDoctorSchedule = async (req, res, next) => {
   try {

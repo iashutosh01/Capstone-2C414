@@ -131,40 +131,35 @@ export const isDoctorAvailableForSlot = async ({
   const normalizedStartTime = normalizeTime(startTime);
   const normalizedEndTime = normalizeTime(endTime);
 
-  const doctorConflictQuery = {
-    doctor: doctor._id,
+  const PENDING_EXPIRATION_MINUTES = 15;
+  const expirationDate = new Date(Date.now() - PENDING_EXPIRATION_MINUTES * 60 * 1000);
+
+  const conflictClause = {
     appointmentDate: { $gte: dayStart, $lte: dayEnd },
-    $expr: {
-      $and: [
-        { $lt: [{ $toInt: { $replaceAll: { input: '$startTime', find: ':', replacement: '' } } }, Number(normalizedEndTime.replace(':', ''))] },
-        { $gt: [{ $toInt: { $replaceAll: { input: '$endTime', find: ':', replacement: '' } } }, Number(normalizedStartTime.replace(':', ''))] },
-      ],
-    },
-    status: { $in: ACTIVE_APPOINTMENT_STATUSES },
+    startTime: { $lt: normalizedEndTime },
+    endTime: { $gt: normalizedStartTime },
+    $or: [
+      { status: { $in: ['confirmed', 'scheduled', 'rescheduled', 'auto-assigned'] } },
+      { status: 'pending_payment', createdAt: { $gte: expirationDate } },
+    ],
   };
-  const queries = [Appointment.findOne(doctorConflictQuery)];
 
   if (excludeAppointmentId) {
-    doctorConflictQuery._id = { $ne: excludeAppointmentId };
+    conflictClause._id = { $ne: excludeAppointmentId };
   }
+
+  const doctorConflictQuery = {
+    doctor: doctor._id,
+    ...conflictClause,
+  };
+
+  const queries = [Appointment.findOne(doctorConflictQuery)];
 
   if (patientId) {
     const patientConflictQuery = {
       patient: patientId,
-      appointmentDate: { $gte: dayStart, $lte: dayEnd },
-      $expr: {
-        $and: [
-          { $lt: [{ $toInt: { $replaceAll: { input: '$startTime', find: ':', replacement: '' } } }, Number(normalizedEndTime.replace(':', ''))] },
-          { $gt: [{ $toInt: { $replaceAll: { input: '$endTime', find: ':', replacement: '' } } }, Number(normalizedStartTime.replace(':', ''))] },
-        ],
-      },
-      status: { $in: ACTIVE_APPOINTMENT_STATUSES },
+      ...conflictClause,
     };
-
-    if (excludeAppointmentId) {
-      patientConflictQuery._id = { $ne: excludeAppointmentId };
-    }
-
     queries.push(Appointment.findOne(patientConflictQuery));
   }
 

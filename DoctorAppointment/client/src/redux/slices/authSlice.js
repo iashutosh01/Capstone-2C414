@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const getUserFromStorage = () => {
   const user = localStorage.getItem('user');
@@ -227,6 +227,7 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.user = action.payload.data.user;
         state.accessToken = action.payload.data.accessToken;
+        state.error = null;
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
@@ -321,11 +322,17 @@ const authSlice = createSlice({
       })
       .addCase(getCurrentUser.fulfilled, (state, action) => {
         state.loading = false;
+        state.isAuthenticated = true;
         state.user = action.payload.data.user;
+        state.error = null;
       })
       .addCase(getCurrentUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        state.user = null;
+        state.accessToken = null;
+        state.isAuthenticated = false;
+        clearPersistedAuth();
       });
   },
 });

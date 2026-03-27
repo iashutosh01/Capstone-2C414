@@ -127,6 +127,21 @@ const PatientAppointments = () => {
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        {appointment.status === 'confirmed' && (
+                          <Link
+                            to={`/chat/${appointment._id}`}
+                            state={{ 
+                              patientName: `${user?.firstName} ${user?.lastName}`,
+                              doctorName: `Dr. ${appointment.doctor?.firstName} ${appointment.doctor?.lastName}`,
+                              patientId: user?._id,
+                              doctorId: appointment.doctor?._id,
+                            }}
+                          >
+                            <Button variant="primary" size="sm">
+                              Chat
+                            </Button>
+                          </Link>
+                        )}
                         <Link to={`/patient/invoice/${appointment._id}`}>
                           <Button variant="outline" size="sm">
                             View Receipt

@@ -507,3 +507,29 @@ export const logout = async (req, res, next) => {
     return next(error);
   }
 };
+
+export const googleOAuthCallback = async (req, res, next) => {
+  try {
+    const { accessToken, refreshToken } = generateTokens(req.user._id.toString(), req.user.role);
+
+    req.user.refreshToken = refreshToken;
+    req.user.lastLogin = Date.now();
+    await req.user.save();
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    const oauthSuccessUrl =
+      process.env.OAUTH_SUCCESS_URL || 'http://localhost:5173/oauth-success';
+
+    return res.redirect(
+      `${oauthSuccessUrl}?token=${encodeURIComponent(accessToken)}`
+    );
+  } catch (error) {
+    return next(error);
+  }
+};

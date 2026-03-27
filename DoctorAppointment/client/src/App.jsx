@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { useEffect } from 'react';
 
 // Pages
 import Landing from './pages/Landing';
@@ -16,14 +17,24 @@ import BookAppointment from './pages/appointments/BookAppointment';
 import BookingSuccess from './pages/appointments/BookingSuccess';
 import Invoice from './pages/appointments/Invoice';
 import PatientAppointments from './pages/appointments/PatientAppointments';
+import Chat from './pages/Chat';
 
 // Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import { getCurrentUser } from './redux/slices/authSlice';
+
+import ChatbotWidget from './components/common/ChatbotWidget';
 
 function App() {
-  const { isAuthenticated, user } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+  const { accessToken, isAuthenticated, user } = useSelector((state) => state.auth);
 
-  // Redirect authenticated users from home to their dashboard
+  useEffect(() => {
+    if (accessToken && !user) {
+      dispatch(getCurrentUser());
+    }
+  }, [accessToken, dispatch, user]);
+
   const HomeRedirect = () => {
     if (isAuthenticated && user) {
       const dashboardRoutes = {
@@ -31,15 +42,16 @@ function App() {
         doctor: '/doctor/dashboard',
         admin: '/admin/dashboard',
       };
+
       return <Navigate to={dashboardRoutes[user.role] || '/'} replace />;
     }
+
     return <Landing />;
   };
 
   return (
     <Router>
       <Routes>
-        {/* Public Routes */}
         <Route path="/" element={<HomeRedirect />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -48,7 +60,6 @@ function App() {
         <Route path="/oauth-success" element={<OAuthSuccess />} />
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
 
-        {/* Protected Routes - Patient */}
         <Route
           path="/patient/dashboard"
           element={
@@ -90,7 +101,6 @@ function App() {
           }
         />
 
-        {/* Protected Routes - Doctor */}
         <Route
           path="/doctor/dashboard"
           element={
@@ -99,8 +109,11 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/doctor"
+          element={<Navigate to="/doctor/dashboard" replace />}
+        />
 
-        {/* Protected Routes - Admin */}
         <Route
           path="/admin/dashboard"
           element={
@@ -109,10 +122,27 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin"
+          element={<Navigate to="/admin/dashboard" replace />}
+        />
 
-        {/* Catch all - 404 */}
+        <Route
+          path="/chat/:appointmentId"
+          element={
+            <ProtectedRoute allowedRoles={['patient', 'doctor']}>
+              <Chat />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/patient"
+          element={<Navigate to="/patient/dashboard" replace />}
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <ChatbotWidget />
     </Router>
   );
 }

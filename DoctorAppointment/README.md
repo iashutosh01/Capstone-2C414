@@ -1,6 +1,6 @@
-# Hospital Appointment Management System
+# Doctor Appointment Management System
 
-A full-stack MERN application for managing hospital appointments with AI-based doctor availability and appointment slot allocation.
+A full-stack MERN application for managing Doctor appointments with AI-based doctor availability and appointment slot allocation.
 
 ## Features
 
@@ -129,7 +129,7 @@ NODE_ENV=development
 PORT=5000
 
 # Database (MongoDB Atlas example)
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/hospital-appointment
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/Doctor-appointment
 
 # JWT Secrets (generate using: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
 JWT_ACCESS_SECRET=your_access_secret_here
@@ -143,8 +143,8 @@ EMAIL_HOST=smtp.mailtrap.io
 EMAIL_PORT=2525
 EMAIL_USER=your_mailtrap_username
 EMAIL_PASS=your_mailtrap_password
-EMAIL_FROM=noreply@hospitalappointment.com
-EMAIL_FROM_NAME=Hospital Appointment System
+EMAIL_FROM=noreply@Doctorappointment.com
+EMAIL_FROM_NAME=Doctor Appointment System
 ```
 
 #### Generate JWT Secrets

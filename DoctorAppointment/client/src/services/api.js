@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { setCredentials, clearCredentials } from '../redux/slices/authSlice';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // Create axios instance
 const api = axios.create({
@@ -90,3 +90,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+// export { api };

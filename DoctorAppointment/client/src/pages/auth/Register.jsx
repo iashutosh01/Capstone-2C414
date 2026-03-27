@@ -204,14 +204,21 @@ const Register = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
+      <Link
+        to="/"
+        className="absolute left-4 top-4 z-20 inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-600 sm:left-6 sm:top-6"
+      >
+        Home
+      </Link>
+
       <div className="max-w-2xl w-full bg-white p-8 rounded-2xl shadow-xl">
         <div className="mb-8">
           <h2 className="text-center text-3xl font-extrabold text-gray-900">
             Create Your Account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Join our hospital appointment management system
+            Join our Doctor appointment management system
           </p>
 
           {/* Progress indicator */}

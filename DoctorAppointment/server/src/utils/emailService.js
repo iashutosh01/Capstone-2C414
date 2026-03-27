@@ -29,7 +29,7 @@ const buildTransport = () => {
 };
 
 export const sendVerificationEmail = async (email, verificationToken, firstName = 'there') => {
-  const verificationBaseUrl = process.env.VERIFY_EMAIL_URL || 'http://localhost:3000/verify-email';
+  const verificationBaseUrl = process.env.VERIFY_EMAIL_URL || 'http://localhost:5000/verify-email';
   const verificationUrl = `${verificationBaseUrl}?token=${verificationToken}`;
 
   const transporter = buildTransport();

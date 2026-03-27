@@ -14,7 +14,10 @@ import appointmentRoutes from './routes/appointmentRoutes.js';
 import doctorRoutes from './routes/doctorRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import messageRoutes from './routes/messageRoutes.js';
+import chatbotRoutes from './routes/chatbotRoutes.js';
 import errorHandler, { notFound } from './middleware/errorHandler.js';
+import { initializeSocket } from './socket/socketHandler.js';
 
 // Load environment variables
 dotenv.config();
@@ -109,7 +112,7 @@ app.use((req, res, next) => {
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'Hospital Appointment API is running',
+    message: 'Doctor Appointment API is running',
     timestamp: new Date().toISOString(),
   });
 });
@@ -120,11 +123,12 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
-// Socket.io connection
-io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
-});
+// Initialize Socket.io
+// ... (rest of the file)
+initializeSocket(io);
 
 // 404 handler - must be after all routes
 app.use(notFound);
@@ -133,7 +137,7 @@ app.use(notFound);
 app.use(errorHandler);
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
   console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);

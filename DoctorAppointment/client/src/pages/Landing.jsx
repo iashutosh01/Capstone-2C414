@@ -17,9 +17,9 @@ const Landing = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-slate-50 font-sans selection:bg-blue-100 selection:text-blue-900">
       {/* Navigation */}
-      <nav className="bg-white shadow-md fixed w-full top-0 z-50 border-b border-blue-100">
+      <nav className="bg-white/80 backdrop-blur-md shadow-sm fixed w-full top-0 z-50 border-b border-slate-200 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <Link to="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
@@ -29,7 +29,9 @@ const Landing = () => {
                 </svg>
               </div>
               <div>
-                <span className="text-2xl font-bold text-gray-900">MediQueue</span>
+                <span className="text-2xl font-bold text-gray-900">TeleHealth🩺
+
+                </span>
                 <p className="text-xs text-gray-500 hidden sm:block">AI-Powered Healthcare</p>
               </div>
             </Link>
@@ -69,23 +71,23 @@ const Landing = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-28 sm:pt-32 pb-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 via-white to-green-50">
+      <section className="pt-32 sm:pt-40 pb-24 px-4 sm:px-6 lg:px-8 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-blue-50 via-white to-slate-50">
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left Content */}
             <div>
               <div className="inline-block mb-4">
-                <span className="bg-blue-100 text-blue-700 text-sm font-semibold px-4 py-2 rounded-full">
+                <span className="bg-blue-50 border border-blue-200 shadow-sm text-blue-700 text-sm font-medium px-4 py-2 rounded-full">
                   Trusted by 100+ Healthcare Facilities
                 </span>
               </div>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 mb-6 leading-tight">
-                AI-Powered Hospital Appointment
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-slate-900 tracking-tight mb-6 leading-tight">
+                AI-Powered Doctor Appointment
                 <span className="block bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent mt-2">
                   Management System
                 </span>
               </h1>
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+              <p className="text-lg sm:text-xl text-slate-600 mb-8 leading-relaxed max-w-2xl">
                 Transform your healthcare facility with intelligent appointment scheduling.
                 <span className="font-semibold text-gray-900"> Reduce wait times by 60%</span> and
                 <span className="font-semibold text-gray-900"> increase efficiency by 40%</span> with our AI-powered smart allocation system.
@@ -124,7 +126,7 @@ const Landing = () => {
 
             {/* Right Content - Illustration */}
             <div className="relative">
-              <div className="bg-gradient-to-br from-blue-500 to-green-500 rounded-3xl p-8 shadow-2xl">
+              <div className="bg-gradient-to-br from-blue-600 to-teal-500 rounded-3xl p-8 shadow-2xl ring-1 ring-slate-900/5">
                 <div className="bg-white rounded-2xl p-8">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-bold text-gray-900">Today's Schedule</h3>
@@ -164,7 +166,7 @@ const Landing = () => {
                 </div>
               </div>
               {/* Floating Stats */}
-              <div className="absolute -bottom-6 -left-6 bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+              <div className="absolute -bottom-6 -left-6 bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-slate-100 hidden sm:block">
                 <div className="flex items-center space-x-4">
                   <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                     <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -202,9 +204,9 @@ const Landing = () => {
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mb-6 shadow-lg mx-auto">
                   1
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center">Doctor Marks Availability</h3>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center"> Doctor Marks Availability </h3>
                 <p className="text-gray-600 text-center leading-relaxed">
-                  Doctors set their availability and the system creates optimized time slots automatically
+                  Doctors set their availability and the system creates optimized time slots automatically and it helps in optimizing wait times 
                 </p>
                 <div className="mt-6 flex justify-center">
                   <div className="bg-blue-50 p-4 rounded-xl w-full">
@@ -388,7 +390,7 @@ const Landing = () => {
             {/* Left Content */}
             <div>
               <h2 className="text-4xl font-bold text-gray-900 mb-6">
-                Why Healthcare Providers Choose MediQueue
+                Why Healthcare Providers Choose TeleHealth🩺
               </h2>
               <p className="text-xl text-gray-600 mb-8">
                 Transform your healthcare facility with measurable results and improved patient satisfaction
@@ -472,9 +474,9 @@ const Landing = () => {
           <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
             <Link to="/register" className="w-full sm:w-auto">
               <Button
-                variant="secondary"
+                variant="outline"
                 size="lg"
-                className="bg-white text-blue-600 hover:bg-gray-100 shadow-xl w-full"
+                className="bg-transparent border-2 border-white text-white hover:bg-white hover:text-blue-600 w-full"
               >
                 Get Started Free
                 <svg className="w-5 h-5 ml-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -510,10 +512,10 @@ const Landing = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
                 </div>
-                <span className="text-2xl font-bold">MediQueue</span>
+                <span className="text-2xl font-bold">TeleHealth🩺</span>
               </div>
               <p className="text-gray-400 mb-4 max-w-md">
-                AI-Powered Hospital Appointment Management System helping healthcare facilities reduce wait times and improve patient care.
+                AI-Powered Doctor Appointment Management System helping healthcare facilities reduce wait times and improve patient care.
               </p>
               <div className="flex space-x-4">
                 {['facebook', 'twitter', 'linkedin', 'instagram'].map((social) => (
@@ -552,7 +554,7 @@ const Landing = () => {
 
           <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
-              &copy; {new Date().getFullYear()} MediQueue. All rights reserved.
+              &copy; {new Date().getFullYear()} TeleHealth🩺. All rights reserved.
             </p>
             <p className="text-gray-400 text-sm mt-4 md:mt-0">
               Made with care for better healthcare

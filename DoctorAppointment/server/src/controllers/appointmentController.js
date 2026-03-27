@@ -1,15 +1,13 @@
 import Appointment from '../models/Appointment.js';
 import Notification from '../models/Notification.js';
-import Waitlist from '../models/Waitlist.js';
-import User from '../models/User.js';
 import {
   assignSlotFromWaitlist,
   assignWaitlistSlot,
   calculatePriorityScore,
-  isDoctorAvailableForSlot,
-  isTimeRangeValid,
 } from '../utils/aiScheduler.js';
 import { createNotification } from '../utils/notificationService.js';
+import { validateAndPrepareAppointment } from '../utils/appointmentUtils.js';
+import { normalizeDate } from '../utils/dateUtils.js';
 
 const ACTIVE_APPOINTMENT_STATUSES = [
   'pending_payment',
@@ -20,88 +18,6 @@ const ACTIVE_APPOINTMENT_STATUSES = [
 ];
 
 const ensurePatientRole = (user) => user?.role === 'patient';
-
-const normalizeDate = (value) => {
-  const date = new Date(value);
-  date.setHours(0, 0, 0, 0);
-  return date;
-};
-
-const validateBookingInput = ({ doctorId, appointmentDate, startTime, endTime }) => {
-  if (!doctorId || !appointmentDate || !startTime || !endTime) {
-    return {
-      status: 400,
-      code: 'MISSING_FIELDS',
-      message: 'doctorId, appointmentDate, startTime, and endTime are required',
-    };
-  }
-
-  if (!isTimeRangeValid(startTime, endTime)) {
-    return {
-      status: 400,
-      code: 'INVALID_TIME_RANGE',
-      message: 'Start time must be earlier than end time',
-    };
-  }
-
-  return null;
-};
-
-const loadDoctor = async (doctorId) => {
-  return User.findOne({ _id: doctorId, role: 'doctor' });
-};
-
-const buildWaitlistEntry = async ({
-  patientId,
-  doctorId,
-  appointmentDate,
-  startTime,
-  endTime,
-  reason,
-  emergencyLevel,
-  isFollowUp,
-  noShowHistory,
-}) => {
-  const requestedDate = normalizeDate(appointmentDate);
-  const priorityScore = calculatePriorityScore({
-    emergencyLevel,
-    isFollowUp,
-    noShowHistory,
-  });
-
-  let waitlistEntry = await Waitlist.findOne({
-    patient: patientId,
-    doctor: doctorId,
-    requestedDate,
-    preferredStartTime: startTime,
-    status: 'waiting',
-  });
-
-  if (!waitlistEntry) {
-    waitlistEntry = await Waitlist.create({
-      patient: patientId,
-      doctor: doctorId,
-      requestedDate,
-      preferredStartTime: startTime,
-      preferredEndTime: endTime,
-      reason,
-      emergencyLevel,
-      isFollowUp,
-      noShowHistory,
-      priorityScore,
-    });
-  }
-
-  await createNotification({
-    recipient: patientId,
-    type: 'system',
-    title: 'Added to waitlist',
-    message: 'No slot was available, so you have been added to the waitlist.',
-    metadata: { waitlistId: waitlistEntry._id, doctorId, appointmentDate: requestedDate },
-  });
-
-  return waitlistEntry;
-};
 
 const createAppointmentRecord = async ({
   patientId,
@@ -166,78 +82,35 @@ export const bookAppointment = async (req, res, next) => {
       noShowHistory = 0,
     } = req.body;
 
-    const validationError = validateBookingInput({
+    const { waitlist, slotAvailable, doctor } = await validateAndPrepareAppointment({
       doctorId,
       appointmentDate,
       startTime,
       endTime,
-    });
-
-    if (validationError) {
-      return res.status(validationError.status).json({
-        success: false,
-        error: {
-          code: validationError.code,
-          message: validationError.message,
-        },
-      });
-    }
-
-    const doctor = await loadDoctor(doctorId);
-    if (!doctor) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          code: 'DOCTOR_NOT_FOUND',
-          message: 'Doctor not found',
-        },
-      });
-    }
-
-    console.log('[BookingDebug] Doctor booking request', {
-      doctorId: doctor._id.toString(),
-      availabilityStatus: doctor.availabilityStatus,
-      isAvailable: doctor.isAvailable,
-      availableSlots: doctor.availableSlots,
-      appointmentDate,
-      startTime,
-      endTime,
-    });
-
-    const slotAvailable = await isDoctorAvailableForSlot({
-      doctor,
-      appointmentDate,
-      startTime,
-      endTime,
       patientId: req.user._id,
+      reason,
+      emergencyLevel,
+      isFollowUp,
+      noShowHistory,
     });
 
-    console.log('[BookingDebug] Slot availability result', {
-      doctorId: doctor._id.toString(),
-      appointmentDate,
-      startTime,
-      endTime,
-      slotAvailable,
-    });
-
-    if (!slotAvailable) {
-      const waitlistEntry = await buildWaitlistEntry({
-        patientId: req.user._id,
-        doctorId,
-        appointmentDate,
-        startTime,
-        endTime,
-        reason,
-        emergencyLevel,
-        isFollowUp,
-        noShowHistory,
-      });
-
+    if (waitlist) {
       return res.status(201).json({
         success: true,
         message: 'No slot was available. Patient added to waitlist.',
         data: {
-          waitlist: waitlistEntry,
+          waitlist,
+        },
+      });
+    }
+
+    if (!slotAvailable) {
+      // This should not happen if waitlist is not created, but as a safeguard
+      return res.status(409).json({
+        success: false,
+        error: {
+          code: 'SLOT_NOT_AVAILABLE',
+          message: 'The requested time slot is not available. Please choose a different time.',
         },
       });
     }
@@ -281,6 +154,15 @@ export const bookAppointment = async (req, res, next) => {
       },
     });
   } catch (error) {
+    if (error.status && error.code) {
+      return res.status(error.status).json({
+        success: false,
+        error: {
+          code: error.code,
+          message: error.message,
+        },
+      });
+    }
     return next(error);
   }
 };
@@ -399,6 +281,10 @@ export const cancelAppointment = async (req, res, next) => {
   }
 };
 
+import { validateBookingInput, loadDoctor } from '../utils/appointmentUtils.js';
+
+//... (other code)
+
 export const rescheduleAppointment = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -451,37 +337,25 @@ export const rescheduleAppointment = async (req, res, next) => {
     }
 
     const targetDoctorId = doctorId || appointment.doctor;
-    const validationError = validateBookingInput({
-      doctorId: targetDoctorId,
-      appointmentDate,
-      startTime,
-      endTime,
-    });
-
-    if (validationError) {
-      return res.status(validationError.status).json({
+    
+    try {
+      validateBookingInput({
+        doctorId: targetDoctorId,
+        appointmentDate,
+        startTime,
+        endTime,
+      });
+    } catch (error) {
+      return res.status(error.status).json({
         success: false,
         error: {
-          code: validationError.code,
-          message: validationError.message,
+          code: error.code,
+          message: error.message,
         },
       });
     }
 
     const doctor = await loadDoctor(targetDoctorId);
-    if (!doctor) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          code: 'DOCTOR_NOT_FOUND',
-          message: 'Doctor not found',
-        },
-      });
-    }
-
-    appointment.status = 'cancelled';
-    appointment.cancellationReason = 'Rescheduled to a new slot';
-    await appointment.save();
 
     const slotAvailable = await isDoctorAvailableForSlot({
       doctor,
@@ -489,39 +363,23 @@ export const rescheduleAppointment = async (req, res, next) => {
       startTime,
       endTime,
       patientId: appointment.patient,
+      excludeAppointmentId: appointment._id, // Exclude current appointment from check
     });
 
     if (!slotAvailable) {
-      const waitlistEntry = await buildWaitlistEntry({
-        patientId: appointment.patient,
-        doctorId: targetDoctorId,
-        appointmentDate,
-        startTime,
-        endTime,
-        reason: reason || appointment.reason,
-        emergencyLevel: emergencyLevel ?? appointment.emergencyLevel,
-        isFollowUp: isFollowUp ?? appointment.isFollowUp,
-        noShowHistory: noShowHistory ?? appointment.noShowHistory,
-      });
-
-      await createNotification({
-        recipient: appointment.patient,
-        relatedAppointment: appointment._id,
-        type: 'appointment-rescheduled',
-        title: 'Appointment moved to waitlist',
-        message: 'Your original appointment was cancelled and the new requested slot has been added to the waitlist.',
-        metadata: { oldAppointmentId: appointment._id, waitlistId: waitlistEntry._id },
-      });
-
-      return res.status(200).json({
-        success: true,
-        message: 'Original appointment cancelled and new request added to waitlist',
-        data: {
-          cancelledAppointment: appointment,
-          waitlist: waitlistEntry,
+      return res.status(409).json({
+        success: false,
+        error: {
+          code: 'SLOT_NOT_AVAILABLE',
+          message: 'The requested time slot is not available. Please choose a different time.',
         },
       });
     }
+
+    // Now that we've confirmed the new slot is available, cancel the old one.
+    appointment.status = 'cancelled';
+    appointment.cancellationReason = 'Rescheduled to a new slot';
+    await appointment.save();
 
     const newAppointment = await createAppointmentRecord({
       patientId: appointment.patient,
@@ -584,6 +442,15 @@ export const rescheduleAppointment = async (req, res, next) => {
       },
     });
   } catch (error) {
+    if (error.status && error.code) {
+      return res.status(error.status).json({
+        success: false,
+        error: {
+          code: error.code,
+          message: error.message,
+        },
+      });
+    }
     return next(error);
   }
 };
