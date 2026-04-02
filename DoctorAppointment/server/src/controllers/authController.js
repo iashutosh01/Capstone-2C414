@@ -2,20 +2,8 @@ import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
 import { generateTokens, verifyRefreshToken } from '../utils/generateToken.js';
-import { sendVerificationEmail } from '../utils/emailService.js';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-const generateVerificationToken = () => {
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-  return {
-    rawToken,
-    hashedToken,
-    expiresAt: Date.now() + 15 * 60 * 1000,
-  };
-};
 
 const sanitizeOAuthName = (value, fallback) => {
   if (!value || /\d/.test(value)) {
@@ -53,8 +41,6 @@ export const register = async (req, res, next) => {
       });
     }
 
-    const { rawToken, hashedToken, expiresAt } = generateVerificationToken();
-
     const user = await User.create({
       email,
       password,
@@ -62,17 +48,13 @@ export const register = async (req, res, next) => {
       lastName,
       phone,
       role: role || 'patient',
-      isEmailVerified: false,
-      emailVerificationToken: hashedToken,
-      emailVerificationExpires: expiresAt,
+      isEmailVerified: true,
       ...otherFields,
     });
 
-    await sendVerificationEmail(user.email, rawToken, user.firstName);
-
     return res.status(201).json({
       success: true,
-      message: 'Registration successful. Please verify your email before logging in.',
+      message: 'Registration successful. Please log in to continue.',
       data: {
         user: {
           id: user._id,
@@ -292,26 +274,11 @@ export const resendVerificationEmail = async (req, res, next) => {
       });
     }
 
-    if (user.isEmailVerified) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'ALREADY_VERIFIED',
-          message: 'Email is already verified',
-        },
-      });
-    }
-
-    const { rawToken, hashedToken, expiresAt } = generateVerificationToken();
-    user.emailVerificationToken = hashedToken;
-    user.emailVerificationExpires = expiresAt;
-    await user.save();
-
-    await sendVerificationEmail(user.email, rawToken, user.firstName);
-
     return res.status(200).json({
       success: true,
-      message: 'Verification email sent successfully',
+      message: user.isEmailVerified
+        ? 'Email verification is already complete. You can log in directly.'
+        : 'Email sending is disabled for now. You can log in directly once registered.',
     });
   } catch (error) {
     return next(error);

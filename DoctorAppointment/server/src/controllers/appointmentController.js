@@ -1,4 +1,5 @@
 import Appointment from '../models/Appointment.js';
+import Coupon from '../models/Coupon.js';
 import Notification from '../models/Notification.js';
 import {
   assignSlotFromWaitlist,
@@ -8,6 +9,11 @@ import {
 import { createNotification } from '../utils/notificationService.js';
 import { validateAndPrepareAppointment } from '../utils/appointmentUtils.js';
 import { normalizeDate } from '../utils/dateUtils.js';
+import {
+  sendAppointmentConfirmedEmail,
+  sendNewAppointmentAssignedEmail,
+} from '../utils/emailService.js';
+import { normalizeCurrencyValue, validateCouponForAmount } from '../utils/paymentUtils.js';
 
 const ACTIVE_APPOINTMENT_STATUSES = [
   'pending_payment',
@@ -18,6 +24,29 @@ const ACTIVE_APPOINTMENT_STATUSES = [
 ];
 
 const ensurePatientRole = (user) => user?.role === 'patient';
+
+const buildRequestedSlotDateTime = (appointmentDate, startTime) => {
+  if (!appointmentDate || !startTime) {
+    return null;
+  }
+
+  let date;
+
+  if (typeof appointmentDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)) {
+    const [year, month, day] = appointmentDate.split('-').map(Number);
+    date = new Date(year, month - 1, day);
+  } else {
+    date = new Date(appointmentDate);
+  }
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const [hours = '0', minutes = '0'] = String(startTime).split(':');
+  date.setHours(Number(hours), Number(minutes), 0, 0);
+  return date;
+};
 
 const createAppointmentRecord = async ({
   patientId,
@@ -31,6 +60,8 @@ const createAppointmentRecord = async ({
   isFollowUp = false,
   noShowHistory = 0,
   status = 'scheduled',
+  paymentStatus,
+  payment,
   source = 'manual',
   rescheduledFrom = null,
 }) => {
@@ -53,6 +84,8 @@ const createAppointmentRecord = async ({
     noShowHistory,
     priorityScore,
     status,
+    ...(paymentStatus ? { paymentStatus } : {}),
+    ...(payment ? { payment } : {}),
     source,
     rescheduledFrom,
   });
@@ -80,7 +113,23 @@ export const bookAppointment = async (req, res, next) => {
       emergencyLevel = 1,
       isFollowUp = false,
       noShowHistory = 0,
+      couponCode = '',
+      paymentId = '',
+      paymentOrderId = '',
+      paymentSignature = '',
     } = req.body;
+
+    const requestedSlotDateTime = buildRequestedSlotDateTime(appointmentDate, startTime);
+
+    if (requestedSlotDateTime && requestedSlotDateTime < new Date()) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'PAST_TIME_SLOT',
+          message: 'Cannot book past time slot',
+        },
+      });
+    }
 
     const { waitlist, slotAvailable, doctor } = await validateAndPrepareAppointment({
       doctorId,
@@ -115,6 +164,53 @@ export const bookAppointment = async (req, res, next) => {
       });
     }
 
+    if (!paymentId) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'PAYMENT_REQUIRED',
+          message: 'Payment must be completed before confirming the appointment',
+        },
+      });
+    }
+
+    const baseAmount = normalizeCurrencyValue(doctor.consultationFee || 0);
+
+    if (!baseAmount) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_CONSULTATION_FEE',
+          message: 'Doctor consultation fee is not configured properly',
+        },
+      });
+    }
+
+    const couponDetails = await validateCouponForAmount({
+      couponCode,
+      amount: baseAmount,
+    });
+    const finalAmount = couponDetails?.finalAmount ?? baseAmount;
+    const payment = {
+      originalAmount: Math.round(baseAmount * 100),
+      discountAmount: Math.round((couponDetails?.discountApplied ?? 0) * 100),
+      amount: Math.round(finalAmount * 100),
+      currency: 'INR',
+      orderId: paymentOrderId,
+      paymentId,
+      signature: paymentSignature,
+      paidAt: new Date(),
+      coupon: couponDetails
+        ? {
+            couponId: couponDetails.coupon._id,
+            code: couponDetails.coupon.code,
+            discountType: couponDetails.coupon.discountType,
+            discountValue: couponDetails.coupon.discountValue,
+            discountApplied: Math.round(couponDetails.discountApplied * 100),
+          }
+        : undefined,
+    };
+
     const appointment = await createAppointmentRecord({
       patientId: req.user._id,
       doctorId,
@@ -126,7 +222,16 @@ export const bookAppointment = async (req, res, next) => {
       emergencyLevel,
       isFollowUp,
       noShowHistory,
+      status: 'confirmed',
+      paymentStatus: 'paid',
+      payment,
     });
+
+    if (payment.coupon?.couponId) {
+      await Coupon.findByIdAndUpdate(payment.coupon.couponId, {
+        $inc: { usedCount: 1 },
+      });
+    }
 
     await createNotification({
       recipient: req.user._id,
@@ -145,6 +250,27 @@ export const bookAppointment = async (req, res, next) => {
       message: `A patient booked an appointment for ${startTime}-${endTime}.`,
       metadata: { patientId: req.user._id, appointmentDate: normalizeDate(appointmentDate) },
     });
+
+    await Promise.allSettled([
+      sendAppointmentConfirmedEmail({
+        patientEmail: req.user.email,
+        patientName: `${req.user.firstName} ${req.user.lastName}`.trim(),
+        doctorName: `${doctor.firstName} ${doctor.lastName}`.trim(),
+        appointmentDate,
+        startTime,
+        endTime,
+        reason,
+      }),
+      sendNewAppointmentAssignedEmail({
+        doctorEmail: doctor.email,
+        doctorName: `${doctor.firstName} ${doctor.lastName}`.trim(),
+        patientName: `${req.user.firstName} ${req.user.lastName}`.trim(),
+        appointmentDate,
+        startTime,
+        endTime,
+        reason,
+      }),
+    ]);
 
     return res.status(201).json({
       success: true,
@@ -337,6 +463,17 @@ export const rescheduleAppointment = async (req, res, next) => {
     }
 
     const targetDoctorId = doctorId || appointment.doctor;
+    const requestedSlotDateTime = buildRequestedSlotDateTime(appointmentDate, startTime);
+
+    if (requestedSlotDateTime && requestedSlotDateTime < new Date()) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'PAST_TIME_SLOT',
+          message: 'Cannot book past time slot',
+        },
+      });
+    }
     
     try {
       validateBookingInput({

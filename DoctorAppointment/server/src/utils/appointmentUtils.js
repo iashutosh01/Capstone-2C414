@@ -8,8 +8,27 @@ import {
 import { createNotification } from './notificationService.js';
 import { normalizeDate } from './dateUtils.js';
 
-export const validateBookingInput = ({ doctorId, appointmentDate, startTime, endTime }) => {
-  if (!doctorId || !appointmentDate || !startTime || !endTime) {
+export const validateBookingInput = (
+  { doctorId, appointmentDate, startTime, endTime },
+  { allowMissingTime = false } = {}
+) => {
+  if (!doctorId || !appointmentDate) {
+    throw {
+      status: 400,
+      code: 'MISSING_FIELDS',
+      message: 'doctorId and appointmentDate are required',
+    };
+  }
+
+  if ((startTime && !endTime) || (!startTime && endTime)) {
+    throw {
+      status: 400,
+      code: 'MISSING_FIELDS',
+      message: 'startTime and endTime must both be provided',
+    };
+  }
+
+  if (!allowMissingTime && (!startTime || !endTime)) {
     throw {
       status: 400,
       code: 'MISSING_FIELDS',
@@ -17,7 +36,7 @@ export const validateBookingInput = ({ doctorId, appointmentDate, startTime, end
     };
   }
 
-  if (!isTimeRangeValid(startTime, endTime)) {
+  if (startTime && endTime && !isTimeRangeValid(startTime, endTime)) {
     throw {
       status: 400,
       code: 'INVALID_TIME_RANGE',
@@ -36,6 +55,31 @@ export const loadDoctor = async (doctorId) => {
     };
   }
   return doctor;
+};
+
+export const checkDoctorAvailability = async (
+  doctorId,
+  appointmentDate,
+  startTime,
+  endTime,
+  options = {}
+) => {
+  try {
+    validateBookingInput({ doctorId, appointmentDate, startTime, endTime });
+
+    const doctor = options.doctor || (await loadDoctor(doctorId));
+
+    return await isDoctorAvailableForSlot({
+      doctor,
+      appointmentDate,
+      startTime,
+      endTime,
+      patientId: options.patientId || null,
+      excludeAppointmentId: options.excludeAppointmentId || null,
+    });
+  } catch (error) {
+    return false;
+  }
 };
 
 export const buildWaitlistEntry = async ({
@@ -101,17 +145,39 @@ export const validateAndPrepareAppointment = async ({
   isFollowUp,
   noShowHistory,
 }) => {
-  validateBookingInput({ doctorId, appointmentDate, startTime, endTime });
+  validateBookingInput(
+    { doctorId, appointmentDate, startTime, endTime },
+    { allowMissingTime: true }
+  );
 
   const doctor = await loadDoctor(doctorId);
 
-  const slotAvailable = await isDoctorAvailableForSlot({
-    doctor,
+  if (!startTime || !endTime) {
+    const waitlistEntry = await buildWaitlistEntry({
+      patientId,
+      doctorId,
+      appointmentDate,
+      startTime: '',
+      endTime: '',
+      reason,
+      emergencyLevel,
+      isFollowUp,
+      noShowHistory,
+    });
+
+    return { waitlist: waitlistEntry, doctor };
+  }
+
+  const slotAvailable = await checkDoctorAvailability(
+    doctorId,
     appointmentDate,
     startTime,
     endTime,
-    patientId,
-  });
+    {
+      doctor,
+      patientId,
+    }
+  );
 
   if (!slotAvailable) {
     const waitlistEntry = await buildWaitlistEntry({

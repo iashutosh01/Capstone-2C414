@@ -25,6 +25,7 @@ const DoctorDashboard = () => {
     slotDate: '',
     startTime: '',
     endTime: '',
+    slotDuration: user?.availableSlots?.[0]?.slotDuration || 30,
     availabilityNotes: '',
   });
 
@@ -159,6 +160,20 @@ const DoctorDashboard = () => {
                 value={availabilityForm.endTime}
                 onChange={(event) =>
                   setAvailabilityForm((previous) => ({ ...previous, endTime: event.target.value }))
+                }
+              />
+              <Input
+                label="Slot duration (minutes)"
+                type="number"
+                min="5"
+                step="5"
+                name="slotDuration"
+                value={availabilityForm.slotDuration}
+                onChange={(event) =>
+                  setAvailabilityForm((previous) => ({
+                    ...previous,
+                    slotDuration: event.target.value,
+                  }))
                 }
               />
               <Input

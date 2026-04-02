@@ -34,8 +34,6 @@ const Register = () => {
   });
 
   const [formErrors, setFormErrors] = useState({});
-  const [registrationSuccess, setRegistrationSuccess] = useState(false);
-
   useEffect(() => {
     dispatch(clearError());
     dispatch(clearMessage());
@@ -49,9 +47,9 @@ const Register = () => {
 
   useEffect(() => {
     if (message && message.includes('Registration successful')) {
-      setRegistrationSuccess(true);
+      navigate('/login', { replace: true });
     }
-  }, [message]);
+  }, [message, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -103,10 +101,6 @@ const Register = () => {
 
     if (!formData.password) {
       errors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
-    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/.test(formData.password)) {
-      errors.password = 'Password must contain uppercase, lowercase, number, and special character';
     }
 
     if (!formData.confirmPassword) {
@@ -178,30 +172,6 @@ const Register = () => {
 
     await dispatch(register(submitData));
   };
-
-  if (registrationSuccess) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 py-12 px-4">
-        <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl text-center">
-          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
-            <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h2>
-          <p className="text-gray-600 mb-6">{message}</p>
-          <Button
-            onClick={() => navigate('/login')}
-            variant="primary"
-            size="lg"
-            fullWidth
-          >
-            Continue to Login
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">

@@ -9,12 +9,12 @@ import NotificationBell from '../../components/common/NotificationBell';
 import RatingStars from '../../components/common/RatingStars';
 import {
   applyCoupon,
+  bookAppointment,
   clearAppointmentError,
   clearCouponPreview,
   clearAppointmentSuccess,
   createPaymentOrder,
   getDoctors,
-  verifyAppointmentPayment,
 } from '../../redux/slices/appointmentSlice';
 
 const initialForm = {
@@ -44,6 +44,29 @@ const loadRazorpayScript = () => {
   });
 };
 
+const buildLocalDateTime = (dateValue, timeValue) => {
+  if (!dateValue || !timeValue) {
+    return null;
+  }
+
+  const [year, month, day] = String(dateValue).split('-').map(Number);
+  const [hours, minutes] = String(timeValue).split(':').map(Number);
+
+  if (!year || !month || !day || Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return null;
+  }
+
+  return new Date(year, month - 1, day, hours, minutes, 0, 0);
+};
+
+const isSameLocalDate = (left, right) => {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+};
+
 const BookAppointment = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -52,13 +75,29 @@ const BookAppointment = () => {
     useSelector((state) => state.appointments);
   const [formData, setFormData] = useState(initialForm);
   const [checkoutError, setCheckoutError] = useState('');
+  const [currentTime, setCurrentTime] = useState(() => new Date());
 
   useEffect(() => {
-    dispatch(getDoctors());
     dispatch(clearAppointmentError());
     dispatch(clearAppointmentSuccess());
     dispatch(clearCouponPreview());
   }, [dispatch]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 30000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    dispatch(
+      getDoctors(
+        formData.appointmentDate ? { appointmentDate: formData.appointmentDate } : {}
+      )
+    );
+  }, [dispatch, formData.appointmentDate]);
 
   const selectedDoctor = useMemo(
     () => doctors.find((doctor) => doctor._id === formData.doctorId),
@@ -75,6 +114,27 @@ const BookAppointment = () => {
     [doctors]
   );
 
+  const availableTimeSlots = useMemo(
+    () => {
+      const slots = selectedDoctor?.availableTimeSlots || [];
+
+      if (!formData.appointmentDate) {
+        return slots;
+      }
+
+      const selectedDate = buildLocalDateTime(formData.appointmentDate, '00:00');
+      if (!selectedDate || !isSameLocalDate(selectedDate, currentTime)) {
+        return slots;
+      }
+
+      return slots.filter((slot) => {
+        const slotStart = buildLocalDateTime(formData.appointmentDate, slot.startTime);
+        return slotStart && slotStart.getTime() > currentTime.getTime();
+      });
+    },
+    [selectedDoctor, formData.appointmentDate, currentTime]
+  );
+
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
     setCheckoutError('');
@@ -83,11 +143,49 @@ const BookAppointment = () => {
       dispatch(clearCouponPreview());
     }
 
+    setFormData((previous) => {
+      const nextValue = type === 'checkbox' ? checked : value;
+      const shouldResetSelectedSlot = name === 'doctorId' || name === 'appointmentDate';
+
+      return {
+        ...previous,
+        [name]: nextValue,
+        ...(shouldResetSelectedSlot ? { startTime: '', endTime: '' } : {}),
+      };
+    });
+  };
+
+  const handleSlotChange = (event) => {
+    const selectedValue = event.target.value;
+    const selectedSlot = availableTimeSlots.find(
+      (slot) => `${slot.startTime}-${slot.endTime}` === selectedValue
+    );
+
     setFormData((previous) => ({
       ...previous,
-      [name]: type === 'checkbox' ? checked : value,
+      startTime: selectedSlot?.startTime || '',
+      endTime: selectedSlot?.endTime || '',
     }));
   };
+
+  useEffect(() => {
+    if (!formData.startTime || !formData.endTime) {
+      return;
+    }
+
+    const selectedSlotStillAvailable = availableTimeSlots.some(
+      (slot) =>
+        slot.startTime === formData.startTime && slot.endTime === formData.endTime
+    );
+
+    if (!selectedSlotStillAvailable) {
+      setFormData((previous) => ({
+        ...previous,
+        startTime: '',
+        endTime: '',
+      }));
+    }
+  }, [availableTimeSlots, formData.endTime, formData.startTime]);
 
   const handleApplyCoupon = async () => {
     setCheckoutError('');
@@ -110,16 +208,74 @@ const BookAppointment = () => {
     );
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setCheckoutError('');
-
-    const result = await dispatch(
-      createPaymentOrder({
+  const handleConfirmBooking = async (paymentDetails = {}) => {
+    const bookingResult = await dispatch(
+      bookAppointment({
         ...formData,
         emergencyLevel: Number(formData.emergencyLevel),
         noShowHistory: Number(formData.noShowHistory),
         couponCode: formData.couponCode.trim(),
+        paymentId: paymentDetails.paymentId || '',
+        paymentOrderId: paymentDetails.orderId || '',
+        paymentSignature: paymentDetails.signature || '',
+      })
+    );
+
+    if (!bookAppointment.fulfilled.match(bookingResult)) {
+      return false;
+    }
+
+    if (bookingResult.payload.data.waitlist) {
+      setFormData(initialForm);
+      dispatch(clearCouponPreview());
+      return true;
+    }
+
+    const appointmentId = bookingResult.payload.data.appointment?._id;
+
+    setFormData(initialForm);
+    dispatch(clearCouponPreview());
+
+    if (appointmentId) {
+      navigate(`/patient/booking-success/${appointmentId}`);
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setCheckoutError('');
+
+    if (availableTimeSlots.length > 0 && (!formData.startTime || !formData.endTime)) {
+      setCheckoutError('Select one of the available time slots before continuing.');
+      return;
+    }
+
+    if (!selectedDoctor) {
+      setCheckoutError('Select a doctor before continuing.');
+      return;
+    }
+
+    if (availableTimeSlots.length === 0) {
+      await handleConfirmBooking();
+      return;
+    }
+
+    const payableAmount = Math.round(
+      Number(couponPreview?.finalAmount ?? selectedDoctor.consultationFee ?? 0) * 100
+    );
+
+    if (!Number.isFinite(payableAmount) || payableAmount <= 0) {
+      setCheckoutError('Doctor consultation fee is not configured properly.');
+      return;
+    }
+
+    const result = await dispatch(
+      createPaymentOrder({
+        amount: payableAmount,
+        currency: 'INR',
+        receipt: `receipt_${Date.now()}`,
       })
     );
 
@@ -127,8 +283,13 @@ const BookAppointment = () => {
       return;
     }
 
-    if (result.payload.data.waitlist) {
-      setFormData(initialForm);
+    const { order, orderId, razorpayKeyId } = result.payload.data;
+
+    if (order?.provider === 'mock' || !razorpayKeyId) {
+      await handleConfirmBooking({
+        paymentId: orderId,
+        orderId,
+      });
       return;
     }
 
@@ -138,8 +299,6 @@ const BookAppointment = () => {
       setCheckoutError('Unable to load Razorpay checkout right now. Please try again.');
       return;
     }
-
-    const { order, appointmentId, razorpayKeyId } = result.payload.data;
 
     const razorpay = new window.Razorpay({
       key: razorpayKeyId,
@@ -157,20 +316,11 @@ const BookAppointment = () => {
         color: '#2563eb',
       },
       handler: async (response) => {
-        const verifyResult = await dispatch(
-          verifyAppointmentPayment({
-            appointmentId,
-            razorpayOrderId: response.razorpay_order_id,
-            razorpayPaymentId: response.razorpay_payment_id,
-            razorpaySignature: response.razorpay_signature,
-          })
-        );
-
-        if (verifyAppointmentPayment.fulfilled.match(verifyResult)) {
-          setFormData(initialForm);
-          dispatch(clearCouponPreview());
-          navigate(`/patient/booking-success/${appointmentId}`);
-        }
+        await handleConfirmBooking({
+          paymentId: response.razorpay_payment_id,
+          orderId: response.razorpay_order_id,
+          signature: response.razorpay_signature,
+        });
       },
       modal: {
         ondismiss: () => {
@@ -325,7 +475,7 @@ const BookAppointment = () => {
                 </div>
               ) : null}
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Input
                   label="Appointment Date"
                   type="date"
@@ -334,22 +484,45 @@ const BookAppointment = () => {
                   onChange={handleChange}
                   required
                 />
-                <Input
-                  label="Start Time"
-                  type="time"
-                  name="startTime"
-                  value={formData.startTime}
-                  onChange={handleChange}
-                  required
-                />
-                <Input
-                  label="End Time"
-                  type="time"
-                  name="endTime"
-                  value={formData.endTime}
-                  onChange={handleChange}
-                  required
-                />
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Available Slots <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={
+                      formData.startTime && formData.endTime
+                        ? `${formData.startTime}-${formData.endTime}`
+                        : ''
+                    }
+                    onChange={handleSlotChange}
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
+                    disabled={!selectedDoctor || !formData.appointmentDate || availableTimeSlots.length === 0}
+                  >
+                    <option value="">
+                      {!selectedDoctor
+                        ? 'Select doctor first'
+                        : !formData.appointmentDate
+                          ? 'Select date first'
+                          : availableTimeSlots.length === 0
+                            ? 'No available slots'
+                            : 'Select a slot'}
+                    </option>
+                    {availableTimeSlots.map((slot) => (
+                      <option
+                        key={`${slot.startTime}-${slot.endTime}`}
+                        value={`${slot.startTime}-${slot.endTime}`}
+                      >
+                        {slot.label}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedDoctor && formData.appointmentDate && availableTimeSlots.length === 0 ? (
+                    <p className="mt-2 text-sm text-amber-700">
+                      No open slots are available for this date. Booking this request will place the
+                      patient on the waitlist.
+                    </p>
+                  ) : null}
+                </div>
               </div>
 
               <Input
@@ -447,7 +620,9 @@ const BookAppointment = () => {
               </label>
 
               <Button type="submit" variant="primary" loading={actionLoading}>
-                Pay & Confirm Booking
+                {availableTimeSlots.length === 0 && selectedDoctor && formData.appointmentDate
+                  ? 'Join Waitlist'
+                  : 'Pay & Confirm Booking'}
               </Button>
             </form>
           </div>

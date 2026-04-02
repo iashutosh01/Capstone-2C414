@@ -30,7 +30,6 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: [true, 'Password is required'],
-      minlength: [8, 'Password must be at least 8 characters long'],
       select: false, // Don't return password by default
     },
     phone: {
@@ -139,6 +138,11 @@ const userSchema = new mongoose.Schema(
         },
         startTime: String, // Format: "09:00"
         endTime: String, // Format: "17:00"
+        slotDuration: {
+          type: Number,
+          min: [5, 'Slot duration must be at least 5 minutes'],
+          default: 30,
+        },
         isActive: {
           type: Boolean,
           default: true,

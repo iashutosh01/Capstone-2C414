@@ -22,11 +22,7 @@ const router = express.Router();
 
 const registerValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
-  body('password')
-    .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/)
-    .withMessage('Password must contain uppercase, lowercase, number, and special character'),
+  body('password').notEmpty().withMessage('Password is required'),
   body('firstName')
     .trim()
     .notEmpty()
@@ -57,11 +53,7 @@ const resendVerificationValidation = [
 ];
 
 const resetPasswordValidation = [
-  body('password')
-    .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/)
-    .withMessage('Password must contain uppercase, lowercase, number, and special character'),
+  body('password').notEmpty().withMessage('Password is required'),
 ];
 
 router.post('/register', registerValidation, validate, register);

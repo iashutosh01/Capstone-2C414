@@ -23,6 +23,14 @@ const toMinutes = (value) => {
   return hours * 60 + minutes;
 };
 
+const fromMinutes = (value) => {
+  const hours = Math.floor(value / 60)
+    .toString()
+    .padStart(2, '0');
+  const minutes = (value % 60).toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
 const parseDateInput = (value) => {
   if (value instanceof Date) {
     return new Date(value);
@@ -36,7 +44,7 @@ const parseDateInput = (value) => {
   return new Date(value);
 };
 
-const getDayName = (date) => {
+export const getDayName = (date) => {
   return parseDateInput(date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
 };
 
@@ -63,6 +71,78 @@ export const calculatePriorityScore = ({
 
 export const isTimeRangeValid = (startTime, endTime) => {
   return Boolean(startTime && endTime && toMinutes(startTime) < toMinutes(endTime));
+};
+
+export const generateTimeSlots = ({ startTime, endTime, slotDuration = 30 }) => {
+  if (!isTimeRangeValid(startTime, endTime)) {
+    return [];
+  }
+
+  const duration = Number(slotDuration) || 30;
+  if (duration <= 0) {
+    return [];
+  }
+
+  const slots = [];
+  const rangeStart = toMinutes(startTime);
+  const rangeEnd = toMinutes(endTime);
+
+  for (let current = rangeStart; current + duration <= rangeEnd; current += duration) {
+    slots.push({
+      startTime: fromMinutes(current),
+      endTime: fromMinutes(current + duration),
+    });
+  }
+
+  return slots;
+};
+
+export const getDoctorAvailableTimeSlots = ({
+  doctor,
+  appointmentDate,
+  appointments = [],
+}) => {
+  if (!doctor || !appointmentDate || !Array.isArray(doctor.availableSlots)) {
+    return [];
+  }
+
+  const requestedDay = getDayName(appointmentDate);
+  const bookedAppointments = appointments.filter((appointment) =>
+    ACTIVE_APPOINTMENT_STATUSES.includes(appointment.status)
+  );
+
+  const uniqueSlots = new Map();
+
+  doctor.availableSlots
+    .filter((slot) => slot.isActive !== false && slot.day === requestedDay)
+    .forEach((slot) => {
+      const generatedSlots = generateTimeSlots({
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        slotDuration: slot.slotDuration,
+      });
+
+      generatedSlots.forEach((generatedSlot) => {
+        const hasConflict = bookedAppointments.some((appointment) => {
+          return (
+            toMinutes(appointment.startTime) < toMinutes(generatedSlot.endTime) &&
+            toMinutes(appointment.endTime) > toMinutes(generatedSlot.startTime)
+          );
+        });
+
+        if (!hasConflict) {
+          const key = `${generatedSlot.startTime}-${generatedSlot.endTime}`;
+          uniqueSlots.set(key, {
+            ...generatedSlot,
+            label: `${generatedSlot.startTime} - ${generatedSlot.endTime}`,
+          });
+        }
+      });
+    });
+
+  return Array.from(uniqueSlots.values()).sort(
+    (left, right) => toMinutes(left.startTime) - toMinutes(right.startTime)
+  );
 };
 
 export const isDoctorSlotWithinAvailability = (doctor, appointmentDate, startTime, endTime) => {

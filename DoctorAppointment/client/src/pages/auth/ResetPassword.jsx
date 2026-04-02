@@ -50,10 +50,6 @@ const ResetPassword = () => {
 
     if (!formData.password) {
       errors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
-    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      errors.password = 'Password must contain uppercase, lowercase, and number';
     }
 
     if (!formData.confirmPassword) {
@@ -143,15 +139,6 @@ const ResetPassword = () => {
               required
             />
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-blue-800 font-medium mb-2">Password Requirements:</p>
-              <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
-                <li>At least 8 characters long</li>
-                <li>Contains at least one uppercase letter</li>
-                <li>Contains at least one lowercase letter</li>
-                <li>Contains at least one number</li>
-              </ul>
-            </div>
           </div>
 
           <Button

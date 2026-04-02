@@ -4,8 +4,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import { clearError, login } from '../../redux/slices/authSlice';
 import Button from '../../components/common/Button';
 
+
+
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { loading, error, isAuthenticated, user } = useSelector((state) => state.auth);
@@ -61,6 +64,7 @@ const Login = () => {
   };
 
   return (
+
     <div className="relative min-h-screen bg-slate-50 flex font-sans">
       <Link
         to="/"
@@ -119,16 +123,31 @@ const Login = () => {
                     Forgot password?
                   </Link>
                 </div>
-                <div className="mt-1.5">
-                  <input
-                    type="password"
-                    required
-                    className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all bg-white"
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  />
-                </div>
+                {/* PASSWORD WITH SHOW/HIDE */}
+            <div>
+              
+
+              <div className="relative mt-1">
+                <input
+                  type={showPassword ? "text" : "password"}  // ✅ dynamic type
+                  required
+                  className="w-full px-4 py-3 border rounded-xl pr-12"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-slate-500"
+                >
+                  {showPassword ? "hide" : "👁️"}
+                </button>
+              </div>
+            </div>
               </div>
 
               <Button 
@@ -145,6 +164,7 @@ const Login = () => {
                   </span>
                 ) : 'Sign in'}
               </Button>
+              
             </form>
 
             <div className="mt-8">

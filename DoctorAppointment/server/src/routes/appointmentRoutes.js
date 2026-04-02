@@ -15,6 +15,10 @@ router.get('/notifications', protect, getNotifications);
 router.patch('/notifications/:id/read', protect, markNotificationAsRead);
 
 // Appointments
+router.get('/my', protect, authorize('patient'), getMyAppointments);
+router.post('/book', protect, authorize('patient'), bookAppointment);
+router.delete('/cancel/:id', protect, authorize('patient'), cancelAppointment);
+router.put('/reschedule/:id', protect, authorize('patient'), rescheduleAppointment);
 router.get('/', protect, authorize('patient'), getMyAppointments);
 router.post('/', protect, authorize('patient'), bookAppointment);
 router.patch('/:id/cancel', protect, authorize('patient'), cancelAppointment);

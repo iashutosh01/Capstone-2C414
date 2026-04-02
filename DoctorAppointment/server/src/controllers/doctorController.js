@@ -1,11 +1,25 @@
 import Appointment from '../models/Appointment.js';
 import User from '../models/User.js';
-import { assignSlotFromWaitlist, assignWaitlistSlot } from '../utils/aiScheduler.js';
+import {
+  assignSlotFromWaitlist,
+  assignWaitlistSlot,
+  getDayName,
+  getDoctorAvailableTimeSlots,
+} from '../utils/aiScheduler.js';
 import { createNotification } from '../utils/notificationService.js';
+import { normalizeDate } from '../utils/dateUtils.js';
+
+const ACTIVE_APPOINTMENT_STATUSES = [
+  'pending_payment',
+  'confirmed',
+  'scheduled',
+  'rescheduled',
+  'auto-assigned',
+];
 
 export const getDoctors = async (req, res, next) => {
   try {
-    const { availabilityStatus, department } = req.query;
+    const { availabilityStatus, department, appointmentDate } = req.query;
     const query = { role: 'doctor' };
 
     if (availabilityStatus) {
@@ -20,10 +34,44 @@ export const getDoctors = async (req, res, next) => {
       'firstName lastName email phone specialization experience consultationFee department availableSlots availabilityStatus isAvailable profileImage rating ratingsCount'
     );
 
+    let doctorsWithSlots = doctors.map((doctor) => ({
+      ...doctor.toObject(),
+      availableTimeSlots: [],
+    }));
+
+    if (appointmentDate && doctors.length > 0) {
+      const dayStart = normalizeDate(appointmentDate);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const appointments = await Appointment.find({
+        doctor: { $in: doctors.map((doctor) => doctor._id) },
+        appointmentDate: { $gte: dayStart, $lte: dayEnd },
+        status: { $in: ACTIVE_APPOINTMENT_STATUSES },
+      }).select('doctor startTime endTime status');
+
+      const appointmentsByDoctor = appointments.reduce((map, appointment) => {
+        const doctorId = appointment.doctor.toString();
+        const doctorAppointments = map.get(doctorId) || [];
+        doctorAppointments.push(appointment);
+        map.set(doctorId, doctorAppointments);
+        return map;
+      }, new Map());
+
+      doctorsWithSlots = doctors.map((doctor) => ({
+        ...doctor.toObject(),
+        availableTimeSlots: getDoctorAvailableTimeSlots({
+          doctor,
+          appointmentDate,
+          appointments: appointmentsByDoctor.get(doctor._id.toString()) || [],
+        }),
+      }));
+    }
+
     return res.status(200).json({
       success: true,
       data: {
-        doctors,
+        doctors: doctorsWithSlots,
       },
     });
   } catch (error) {
@@ -33,7 +81,15 @@ export const getDoctors = async (req, res, next) => {
 
 export const updateDoctorAvailability = async (req, res, next) => {
   try {
-    const { availabilityStatus, availableSlots, slotDate, startTime, endTime, availabilityNotes = '' } = req.body;
+    const {
+      availabilityStatus,
+      availableSlots,
+      slotDate,
+      startTime,
+      endTime,
+      slotDuration = 30,
+      availabilityNotes = '',
+    } = req.body;
 
     if (!availabilityStatus) {
       return res.status(400).json({
@@ -61,7 +117,28 @@ export const updateDoctorAvailability = async (req, res, next) => {
     doctor.availabilityNotes = availabilityNotes;
 
     if (Array.isArray(availableSlots)) {
-      doctor.availableSlots = availableSlots;
+      doctor.availableSlots = availableSlots.map((slot) => ({
+        ...slot,
+        slotDuration: Number(slot.slotDuration) || 30,
+      }));
+    } else if (slotDate && startTime && endTime) {
+      const nextSlot = {
+        day: getDayName(slotDate),
+        startTime,
+        endTime,
+        slotDuration: Number(slotDuration) || 30,
+        isActive: true,
+      };
+
+      const existingSlotIndex = doctor.availableSlots.findIndex(
+        (slot) => slot.day === nextSlot.day
+      );
+
+      if (existingSlotIndex >= 0) {
+        doctor.availableSlots[existingSlotIndex] = nextSlot;
+      } else {
+        doctor.availableSlots.push(nextSlot);
+      }
     }
 
     await doctor.save();
